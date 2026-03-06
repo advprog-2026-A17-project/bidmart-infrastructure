@@ -1,0 +1,37 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: bidmart-gateway
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+      routes:
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: catalogue-service
+          uri: ${CATALOGUE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/catalogue/**
+        - id: auction-service
+          uri: ${AUCTION_SERVICE_URL:http://localhost:8080}
+          predicates:
+            - Path=/api/v1/auctions/**
+        - id: wallet-service
+          uri: ${WALLET_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/wallet/**
