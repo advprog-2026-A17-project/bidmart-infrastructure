@@ -20,15 +20,15 @@ spring:
             allowedHeaders: "*"
       routes:
         - id: auth-service
-          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          uri: ${AUTH_SERVICE_URL:http://localhost:8080}
           predicates:
             - Path=/api/v1/auth/**
         - id: catalogue-service
-          uri: ${CATALOGUE_SERVICE_URL:http://localhost:8082}
+          uri: ${CATALOGUE_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/v1/catalogue/**
         - id: auction-service
-          uri: ${AUCTION_SERVICE_URL:http://localhost:8080}
+          uri: ${AUCTION_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/v1/auctions/**
         - id: wallet-service
