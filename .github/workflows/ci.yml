@@ -1,8 +1,10 @@
 name: Continuous Integration
 
 on:
-  push:
   pull_request:
+    branches: ["staging", "main"]
+  push:
+    branches: ["staging", "main"]
 
 jobs:
   test:
@@ -14,10 +16,11 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
+          java-version: "21"
+          distribution: temurin
           cache: gradle
 
       - name: Run Unit Tests
-        run: chmod +x gradlew && ./gradlew test
-
+        run: |
+          chmod +x gradlew
+          ./gradlew test

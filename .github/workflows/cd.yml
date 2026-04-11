@@ -2,28 +2,26 @@ name: Continuous Deployment
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
+  workflow_dispatch:
 
 jobs:
   deploy:
-    name: Deploy to AWS EC2
+    name: Deploy to Heroku
     runs-on: ubuntu-latest
+    env:
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd ~/bidmart-project/bidmart-infrastructure
-            git fetch origin
-            git checkout ${{ github.ref_name }}
-            git pull origin ${{ github.ref_name }}
-            cd ~/bidmart-project
-            docker compose up --build -d gateway
-            docker image prune -f
+      - name: Install Heroku CLI
+        run: curl https://cli-assets.heroku.com/install.sh | sh
 
+      - name: Deploy container
+        run: |
+          echo "$HEROKU_API_KEY" | docker login --username=_ --password-stdin registry.heroku.com
+          docker build -t registry.heroku.com/${HEROKU_APP_NAME}/web .
+          docker push registry.heroku.com/${HEROKU_APP_NAME}/web
+          heroku container:release web --app "${HEROKU_APP_NAME}"
