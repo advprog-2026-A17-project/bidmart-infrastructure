@@ -4,10 +4,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class BidmartInfrastructureApplication {
+public class BidmartGatewayApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(BidmartInfrastructureApplication.class, args);
+        SpringApplication.run(BidmartGatewayApplication.class, args);
     }
 
 }
