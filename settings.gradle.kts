@@ -1,1 +1,1 @@
-rootProject.name = "bidmartgateway"
+rootProject.name = "bidmart-gateway"
