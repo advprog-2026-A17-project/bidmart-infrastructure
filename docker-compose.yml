@@ -1,0 +1,139 @@
+name: ${COMPOSE_PROJECT_NAME:-bidmart}
+
+services:
+  gateway:
+    image: ${GATEWAY_IMAGE:-bidmart-gateway:local}
+    build:
+      context: .
+    ports:
+      - "${GATEWAY_PORT:-8000}:8000"
+    environment:
+      PORT: 8000
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:8080}
+      CATALOGUE_SERVICE_URL: ${CATALOGUE_SERVICE_URL:-http://catalogue-service:8081}
+      AUCTION_SERVICE_URL: ${AUCTION_SERVICE_URL:-http://auction-service:8082}
+      WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
+    depends_on:
+      - auth-service
+      - catalogue-service
+      - auction-service
+      - wallet-service
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  auth-service:
+    image: ${AUTH_IMAGE:-bidmart-auth-service:local}
+    build:
+      context: ../bidmart-auth-service
+    ports:
+      - "${AUTH_PORT:-8080}:8080"
+    environment:
+      SPRING_DATASOURCE_URL: ${AUTH_DATABASE_URL:-jdbc:postgresql://auth-db:5432/bidmart_auth}
+      SPRING_DATASOURCE_USERNAME: ${AUTH_DB_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${AUTH_DB_PASSWORD:-postgres}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${AUTH_DDL_AUTO:-update}
+    depends_on:
+      - auth-db
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  catalogue-service:
+    image: ${CATALOGUE_IMAGE:-bidmart-catalogue-service:local}
+    build:
+      context: ../bidmart-catalogue-service
+    ports:
+      - "${CATALOGUE_PORT:-8081}:8081"
+    environment:
+      SPRING_DATASOURCE_URL: ${CATALOGUE_DATABASE_URL:-jdbc:postgresql://catalogue-db:5432/bidmart_catalogue}
+      SPRING_DATASOURCE_USERNAME: ${CATALOGUE_DB_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${CATALOGUE_DB_PASSWORD:-postgres}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${CATALOGUE_DDL_AUTO:-update}
+    depends_on:
+      - catalogue-db
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  auction-service:
+    image: ${AUCTION_IMAGE:-bidmart-auction-service-rust:local}
+    build:
+      context: ../bidmart-auction-service-rust
+    ports:
+      - "${AUCTION_PORT:-8082}:8082"
+    environment:
+      BIND_ADDRESS: 0.0.0.0:8082
+      DATABASE_URL: ${AUCTION_DATABASE_URL:-sqlite:///data/bidmart-auction.db}
+      CATALOGUE_SERVICE_URL: ${CATALOGUE_SERVICE_URL:-http://catalogue-service:8081}
+      WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
+    volumes:
+      - auction-rust-data:/data
+    depends_on:
+      - catalogue-service
+      - wallet-service
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  wallet-service:
+    image: ${WALLET_IMAGE:-bidmart-wallet-service:local}
+    build:
+      context: ../bidmart-wallet-service
+    ports:
+      - "${WALLET_PORT:-8083}:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${WALLET_SPRING_PROFILE:-prod}
+      SPRING_DATASOURCE_URL: ${WALLET_DATABASE_URL:-jdbc:postgresql://wallet-db:5432/bidmart_wallet_db}
+      SPRING_DATASOURCE_USERNAME: ${WALLET_DB_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${WALLET_DB_PASSWORD:-postgres}
+      AUCTION_SERVICE_BASE_URL: ${WALLET_AUCTION_SERVICE_BASE_URL:-http://auction-service:8082/api/v1/auctions}
+    depends_on:
+      - wallet-db
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-bidmart-frontend:local}
+    build:
+      context: ../bidmart-frontend
+      args:
+        VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - gateway
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  auth-db:
+    image: postgres:16-alpine
+    ports:
+      - "${AUTH_DB_PORT:-5434}:5432"
+    environment:
+      POSTGRES_DB: bidmart_auth
+      POSTGRES_USER: ${AUTH_DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-postgres}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  catalogue-db:
+    image: postgres:16-alpine
+    ports:
+      - "${CATALOGUE_DB_PORT:-5435}:5432"
+    environment:
+      POSTGRES_DB: bidmart_catalogue
+      POSTGRES_USER: ${CATALOGUE_DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${CATALOGUE_DB_PASSWORD:-postgres}
+    volumes:
+      - catalogue-db-data:/var/lib/postgresql/data
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  wallet-db:
+    image: postgres:16-alpine
+    ports:
+      - "${WALLET_DB_PORT:-5433}:5432"
+    environment:
+      POSTGRES_DB: bidmart_wallet_db
+      POSTGRES_USER: ${WALLET_DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${WALLET_DB_PASSWORD:-postgres}
+    volumes:
+      - wallet-db-data:/var/lib/postgresql/data
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+volumes:
+  auth-db-data:
+  auction-rust-data:
+  catalogue-db-data:
+  wallet-db-data:
