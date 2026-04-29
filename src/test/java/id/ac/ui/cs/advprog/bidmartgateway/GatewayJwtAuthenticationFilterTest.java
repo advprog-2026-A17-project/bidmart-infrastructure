@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GatewayJwtAuthenticationFilterTest {
 
     private static final String SECRET = "bidmart-auth-secret-key-bidmart-auth-secret-key";
+    private static final String INTERNAL_TOKEN = "internal-gateway-token";
     private static final RoutePermissionPolicy ROUTE_PERMISSION_POLICY = new RoutePermissionPolicy();
 
     @Test
@@ -35,7 +36,8 @@ class GatewayJwtAuthenticationFilterTest {
         GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(
                 permissionClient(true),
                 ROUTE_PERMISSION_POLICY,
-                SECRET
+                SECRET,
+                INTERNAL_TOKEN
         );
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/v1/auctions")
@@ -51,7 +53,8 @@ class GatewayJwtAuthenticationFilterTest {
         GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(
                 permissionClient(true),
                 ROUTE_PERMISSION_POLICY,
-                SECRET
+                SECRET,
+                INTERNAL_TOKEN
         );
         String token = token("user-1", "buyer@test.com", List.of("BUYER"));
         AtomicReference<ServerWebExchange> forwardedExchange = new AtomicReference<>();
@@ -69,7 +72,30 @@ class GatewayJwtAuthenticationFilterTest {
         assertEquals("user-1", headers.getFirst("X-User-Id"));
         assertEquals("buyer@test.com", headers.getFirst("X-User-Email"));
         assertEquals("BUYER", headers.getFirst("X-User-Roles"));
+        assertEquals(INTERNAL_TOKEN, headers.getFirst("X-Internal-Service-Token"));
+        assertTrue(headers.containsKey("X-Correlation-Id"));
         assertNull(exchange.getResponse().getStatusCode());
+    }
+
+    @Test
+    void protectedRouteShouldPreserveExistingCorrelationId() {
+        GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(
+                permissionClient(true),
+                ROUTE_PERMISSION_POLICY,
+                SECRET,
+                INTERNAL_TOKEN
+        );
+        String token = token("user-1", "buyer@test.com", List.of("BUYER"));
+        AtomicReference<ServerWebExchange> forwardedExchange = new AtomicReference<>();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/auctions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .header("X-Correlation-Id", "request-123")
+        );
+
+        filter.filter(exchange, captureChain(forwardedExchange)).block();
+
+        assertEquals("request-123", forwardedExchange.get().getRequest().getHeaders().getFirst("X-Correlation-Id"));
     }
 
     @Test
@@ -77,7 +103,8 @@ class GatewayJwtAuthenticationFilterTest {
         GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(
                 permissionClient(false),
                 ROUTE_PERMISSION_POLICY,
-                SECRET
+                SECRET,
+                INTERNAL_TOKEN
         );
         String token = token("seller-1", "seller@test.com", List.of("SELLER"));
         MockServerWebExchange exchange = MockServerWebExchange.from(
