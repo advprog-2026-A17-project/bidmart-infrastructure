@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.bidmartgateway;
 
 import id.ac.ui.cs.advprog.bidmartgateway.security.AuthPermissionClient;
 import id.ac.ui.cs.advprog.bidmartgateway.security.GatewayJwtAuthenticationFilter;
+import id.ac.ui.cs.advprog.bidmartgateway.security.RoutePermissionPolicy;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
@@ -27,10 +28,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GatewayJwtAuthenticationFilterTest {
 
     private static final String SECRET = "bidmart-auth-secret-key-bidmart-auth-secret-key";
+    private static final RoutePermissionPolicy ROUTE_PERMISSION_POLICY = new RoutePermissionPolicy();
 
     @Test
     void protectedRouteShouldRejectMissingJwt() {
-        GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(permissionClient(true), SECRET);
+        GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(
+                permissionClient(true),
+                ROUTE_PERMISSION_POLICY,
+                SECRET
+        );
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/v1/auctions")
         );
@@ -42,7 +48,11 @@ class GatewayJwtAuthenticationFilterTest {
 
     @Test
     void protectedRouteShouldForwardVerifiedIdentityAndStripSpoofedHeaders() {
-        GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(permissionClient(true), SECRET);
+        GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(
+                permissionClient(true),
+                ROUTE_PERMISSION_POLICY,
+                SECRET
+        );
         String token = token("user-1", "buyer@test.com", List.of("BUYER"));
         AtomicReference<ServerWebExchange> forwardedExchange = new AtomicReference<>();
         MockServerWebExchange exchange = MockServerWebExchange.from(
@@ -64,7 +74,11 @@ class GatewayJwtAuthenticationFilterTest {
 
     @Test
     void routeShouldRejectJwtWhenRequiredPermissionIsDenied() {
-        GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(permissionClient(false), SECRET);
+        GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(
+                permissionClient(false),
+                ROUTE_PERMISSION_POLICY,
+                SECRET
+        );
         String token = token("seller-1", "seller@test.com", List.of("SELLER"));
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.method(HttpMethod.POST, "/api/v1/auctions")
