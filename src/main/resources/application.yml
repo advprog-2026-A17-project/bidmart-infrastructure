@@ -39,3 +39,8 @@ spring:
           uri: ${WALLET_SERVICE_URL:http://localhost:8083}
           predicates:
             - Path=/api/v1/wallet/**
+
+app:
+  auth:
+    jwt:
+      secret: ${AUTH_JWT_SECRET:bidmart-auth-secret-key-bidmart-auth-secret-key}
