@@ -30,13 +30,16 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String HEADER_USER_ROLES = "X-User-Roles";
 
     private final AuthPermissionClient authPermissionClient;
+    private final RoutePermissionPolicy routePermissionPolicy;
     private final SecretKey signingKey;
 
     public GatewayJwtAuthenticationFilter(
             AuthPermissionClient authPermissionClient,
+            RoutePermissionPolicy routePermissionPolicy,
             @Value("${app.auth.jwt.secret:bidmart-auth-secret-key-bidmart-auth-secret-key}") String jwtSecret
     ) {
         this.authPermissionClient = authPermissionClient;
+        this.routePermissionPolicy = routePermissionPolicy;
         this.signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -59,7 +62,7 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
             return reject(exchange, HttpStatus.UNAUTHORIZED);
         }
 
-        String requiredPermission = requiredPermission(request.getMethod(), path);
+        String requiredPermission = routePermissionPolicy.requiredPermission(request.getMethod(), path);
         if (requiredPermission == null) {
             return chain.filter(withVerifiedIdentity(exchange, claims));
         }
@@ -138,34 +141,6 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private boolean isPublicRoute(HttpMethod method, String path) {
         return HttpMethod.OPTIONS.equals(method) || path.startsWith("/api/v1/auth/");
-    }
-
-    private String requiredPermission(HttpMethod method, String path) {
-        if (HttpMethod.POST.equals(method) && matchesExact(path, "/api/v1/auctions")) {
-            return "auction:create";
-        }
-        if (HttpMethod.POST.equals(method) && matchesChildAction(path, "/api/v1/auctions", "bids")) {
-            return "bid:place";
-        }
-        if (HttpMethod.POST.equals(method) && matchesChildAction(path, "/api/v1/auctions", "close")) {
-            return "auction:close";
-        }
-        if (HttpMethod.POST.equals(method) && matchesExact(path, "/api/v1/catalogue/listings")) {
-            return "listing:create";
-        }
-        if (path.startsWith("/api/v1/wallet/") || matchesExact(path, "/api/v1/wallet")) {
-            return HttpMethod.GET.equals(method) ? "wallet:view" : "wallet:mutate";
-        }
-        return null;
-    }
-
-    private boolean matchesExact(String actualPath, String expectedPath) {
-        return actualPath.equals(expectedPath) || actualPath.equals(expectedPath + "/");
-    }
-
-    private boolean matchesChildAction(String path, String prefix, String action) {
-        String normalized = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
-        return normalized.startsWith(prefix + "/") && normalized.endsWith("/" + action);
     }
 
     private Mono<Void> reject(ServerWebExchange exchange, HttpStatus status) {
