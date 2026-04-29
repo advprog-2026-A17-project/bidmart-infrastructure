@@ -20,6 +20,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 @Component
 public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
@@ -28,19 +29,24 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String HEADER_USER_ID = "X-User-Id";
     private static final String HEADER_USER_EMAIL = "X-User-Email";
     private static final String HEADER_USER_ROLES = "X-User-Roles";
+    private static final String HEADER_INTERNAL_TOKEN = "X-Internal-Service-Token";
+    private static final String HEADER_CORRELATION_ID = "X-Correlation-Id";
 
     private final AuthPermissionClient authPermissionClient;
     private final RoutePermissionPolicy routePermissionPolicy;
     private final SecretKey signingKey;
+    private final String internalServiceToken;
 
     public GatewayJwtAuthenticationFilter(
             AuthPermissionClient authPermissionClient,
             RoutePermissionPolicy routePermissionPolicy,
-            @Value("${app.auth.jwt.secret:bidmart-auth-secret-key-bidmart-auth-secret-key}") String jwtSecret
+            @Value("${app.auth.jwt.secret:bidmart-auth-secret-key-bidmart-auth-secret-key}") String jwtSecret,
+            @Value("${app.gateway.internal-token:bidmart-local-internal-token}") String internalServiceToken
     ) {
         this.authPermissionClient = authPermissionClient;
         this.routePermissionPolicy = routePermissionPolicy;
         this.signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        this.internalServiceToken = internalServiceToken;
     }
 
     @Override
@@ -108,6 +114,7 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
                     headers.remove(HEADER_USER_ID);
                     headers.remove(HEADER_USER_EMAIL);
                     headers.remove(HEADER_USER_ROLES);
+                    headers.remove(HEADER_INTERNAL_TOKEN);
                 })
                 .build();
         return exchange.mutate().request(request).build();
@@ -120,9 +127,12 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
                     headers.remove(HEADER_USER_ID);
                     headers.remove(HEADER_USER_EMAIL);
                     headers.remove(HEADER_USER_ROLES);
+                    headers.remove(HEADER_INTERNAL_TOKEN);
                     headers.set(HEADER_USER_ID, claims.getSubject());
                     headers.set(HEADER_USER_EMAIL, claims.get("email", String.class));
                     headers.set(HEADER_USER_ROLES, rolesHeader(claims));
+                    headers.set(HEADER_INTERNAL_TOKEN, internalServiceToken);
+                    headers.computeIfAbsent(HEADER_CORRELATION_ID, ignored -> List.of(UUID.randomUUID().toString()));
                 })
                 .build();
         return exchange.mutate().request(request).build();
