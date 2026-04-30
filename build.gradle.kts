@@ -2,6 +2,8 @@ plugins {
     java
     id("org.springframework.boot") version "3.2.4"
     id("io.spring.dependency-management") version "1.1.4"
+    jacoco
+    id("org.sonarqube") version "4.4.1.3373"
 }
 
 group = "id.ac.ui.cs.advprog"
@@ -34,4 +36,20 @@ dependencyManagement {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "advprog-2026-A17-project_bidmart-infrastructure")
+        property("sonar.organization", "advprog-2026-a17-project")
+        property("sonar.host.url", "https://sonarcloud.io")
+    }
 }
