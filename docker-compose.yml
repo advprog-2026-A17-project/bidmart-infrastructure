@@ -42,9 +42,15 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${AUTH_DB_PASSWORD:-postgres}
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${AUTH_DDL_AUTO:-update}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-bidmart-auth-secret-key-bidmart-auth-secret-key}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_TIMEOUT: ${REDIS_TIMEOUT:-2000}
     depends_on:
       auth-db:
         condition: service_healthy
+      redis:
+        condition: service_started
     restart: ${RESTART_POLICY:-unless-stopped}
 
   catalogue-service:
@@ -198,8 +204,26 @@ services:
       retries: 5
     restart: ${RESTART_POLICY:-unless-stopped}
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: ${RESTART_POLICY:-unless-stopped}
+
 volumes:
   auth-db-data:
   auction-rust-data:
   catalogue-db-data:
   wallet-db-data:
+  redis-data:
