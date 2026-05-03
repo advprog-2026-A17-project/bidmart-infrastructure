@@ -150,7 +150,10 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     private boolean isPublicRoute(HttpMethod method, String path) {
-        return HttpMethod.OPTIONS.equals(method) || path.startsWith("/api/v1/auth/");
+        return HttpMethod.OPTIONS.equals(method) || 
+               path.startsWith("/api/v1/auth/") || 
+               path.equals("/ws") || 
+               path.startsWith("/ws/");
     }
 
     private Mono<Void> reject(ServerWebExchange exchange, HttpStatus status) {
