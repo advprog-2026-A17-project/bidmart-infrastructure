@@ -6,6 +6,7 @@ spring:
     name: bidmart-gateway
   cloud:
     gateway:
+      # Centralized CORS Configuration
       globalcors:
         corsConfigurations:
           '[/**]':
@@ -22,23 +23,37 @@ spring:
             exposedHeaders:
               - Authorization
               - Set-Cookie
+              
       routes:
+        # WebSocket Route
+        - id: auth-service-ws
+          uri: ${AUTH_SERVICE_URL:http://localhost:8080}
+          predicates:
+            - Path=/ws/**
+          filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+            
+        # Standard HTTP Routes
         - id: auth-service
           uri: ${AUTH_SERVICE_URL:http://localhost:8080}
           predicates:
             - Path=/api/v1/auth/**
+            
         - id: catalogue-service
           uri: ${CATALOGUE_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/v1/catalogue/**
+            
         - id: auction-service
           uri: ${AUCTION_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/v1/auctions/**
+            
         - id: wallet-service
           uri: ${WALLET_SERVICE_URL:http://localhost:8083}
           predicates:
             - Path=/api/v1/wallet/**
+            
         - id: order-service
           uri: ${ORDER_SERVICE_URL:http://localhost:8084}
           predicates:
