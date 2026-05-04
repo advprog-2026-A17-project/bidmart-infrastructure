@@ -124,7 +124,8 @@ services:
     build:
       context: ../bidmart-frontend
       args:
-        VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-http://localhost:8000}
+        VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-}
+        VITE_GOOGLE_CLIENT_ID: ${OAUTH_GOOGLE_CLIENT_ID:-}
     env_file:
       - path: ../bidmart-frontend/.env
         required: false
