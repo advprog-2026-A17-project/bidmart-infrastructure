@@ -26,6 +26,13 @@ spring:
               
       routes:
         # WebSocket Route
+        - id: notification-service-ws
+          uri: ${ORDER_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/ws/notifications/**
+          filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+
         - id: auth-service-ws
           uri: ${AUTH_SERVICE_URL:http://localhost:8080}
           predicates:
