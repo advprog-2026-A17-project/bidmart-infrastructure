@@ -117,6 +117,25 @@ class GatewayJwtAuthenticationFilterTest {
         assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
     }
 
+    @Test
+    void catalogueSearchShouldBePublicWithoutJwt() {
+        GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(
+                permissionClient(true),
+                ROUTE_PERMISSION_POLICY,
+                SECRET,
+                INTERNAL_TOKEN
+        );
+        AtomicReference<ServerWebExchange> forwardedExchange = new AtomicReference<>();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/catalogue/listings/search?keyword=laptop")
+        );
+
+        filter.filter(exchange, captureChain(forwardedExchange)).block();
+
+        assertEquals("/api/v1/catalogue/listings/search", forwardedExchange.get().getRequest().getURI().getPath());
+        assertNull(exchange.getResponse().getStatusCode());
+    }
+
     private AuthPermissionClient permissionClient(boolean allowed) {
         return (email, permission) -> Mono.just(allowed);
     }
