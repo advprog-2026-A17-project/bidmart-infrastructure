@@ -14,4 +14,11 @@ class GatewayOrderIntegrationContractTest {
         assertTrue(yaml.contains("uri: ${ORDER_SERVICE_URL:http://localhost:8084}"));
         assertTrue(yaml.contains("Path=/api/v1/orders/**"));
     }
+
+    @Test
+    void gatewayConfigShouldSupportNotificationApiTraffic() {
+        String yaml = ContractFileReader.read("src/main/resources/application.yml");
+
+        assertTrue(yaml.contains("/api/v1/notifications/**"));
+    }
 }
