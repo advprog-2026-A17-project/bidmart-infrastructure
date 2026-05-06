@@ -65,8 +65,11 @@ async function main() {
         return api('/api/v1/catalogue/listings/search?page=0&size=1');
     });
 
-    await step('auction listing endpoint is reachable', () => {
-        return api('/api/v1/auctions');
+    await step('auction listing route is reachable through the gateway', () => {
+        return api('/api/v1/auctions', {
+            expectedStatuses: [200, 401, 403],
+            label: 'unauthenticated auction listing route',
+        });
     });
 
     if (!config.skipFrontend) {
@@ -83,6 +86,13 @@ async function main() {
 
     const seller = await step('seller can log in', () => authenticateActor('SELLER'));
     const buyer = await step('buyer can log in', () => authenticateActor('BUYER'));
+
+    await step('authenticated auction listing endpoint is reachable', () => {
+        return api('/api/v1/auctions', {
+            actor: buyer,
+            label: 'authenticated auction listing',
+        });
+    });
 
     await step('buyer wallet exists', () => ensureWallet(buyer));
     await step('buyer wallet can be topped up through sandbox intent', () => topUpBuyerWallet(buyer));
