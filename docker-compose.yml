@@ -18,11 +18,13 @@ services:
       CATALOGUE_SERVICE_URL: ${CATALOGUE_SERVICE_URL:-http://catalogue-service:8081}
       AUCTION_SERVICE_URL: ${AUCTION_SERVICE_URL:-http://auction-service:8082}
       WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
+      ORDER_SERVICE_URL: ${ORDER_SERVICE_URL:-http://order-notification-service:8084}
     depends_on:
       - auth-service
       - catalogue-service
       - auction-service
       - wallet-service
+      - order-notification-service
     restart: ${RESTART_POLICY:-unless-stopped}
 
   auth-service:
@@ -46,11 +48,18 @@ services:
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_TIMEOUT: ${REDIS_TIMEOUT:-2000}
+      SPRING_RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      SPRING_RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      AUTH_WALLET_PROVISIONING_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
     depends_on:
       auth-db:
         condition: service_healthy
       redis:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     restart: ${RESTART_POLICY:-unless-stopped}
 
   catalogue-service:
@@ -69,8 +78,15 @@ services:
       SPRING_DATASOURCE_USERNAME: ${CATALOGUE_DB_USERNAME:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${CATALOGUE_DB_PASSWORD:-postgres}
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${CATALOGUE_DDL_AUTO:-update}
+      SPRING_RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      SPRING_RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
     depends_on:
       catalogue-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: ${RESTART_POLICY:-unless-stopped}
 
@@ -87,14 +103,23 @@ services:
         required: false
     environment:
       BIND_ADDRESS: 0.0.0.0:8082
-      DATABASE_URL: ${AUCTION_DATABASE_URL:-sqlite:///data/bidmart-auction.db}
+      DATABASE_URL: ${AUCTION_DATABASE_URL:-postgresql://postgres:postgres@auction-db:5432/bidmart_auction}
       CATALOGUE_SERVICE_URL: ${CATALOGUE_SERVICE_URL:-http://catalogue-service:8081}
       WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/%2f}
+      BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
+      GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
     volumes:
       - auction-rust-data:/data
     depends_on:
-      - catalogue-service
-      - wallet-service
+      catalogue-service:
+        condition: service_started
+      wallet-service:
+        condition: service_started
+      auction-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     restart: ${RESTART_POLICY:-unless-stopped}
 
   wallet-service:
@@ -109,13 +134,52 @@ services:
       - path: .env
         required: false
     environment:
-      SPRING_PROFILES_ACTIVE: ${WALLET_SPRING_PROFILE:-prod}
-      SPRING_DATASOURCE_URL: ${WALLET_DATABASE_URL:-jdbc:postgresql://wallet-db:5432/bidmart_wallet_db}
-      SPRING_DATASOURCE_USERNAME: ${WALLET_DB_USERNAME:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${WALLET_DB_PASSWORD:-postgres}
+      DATABASE_URL: ${WALLET_DATABASE_URL:-postgresql://postgres:postgres@wallet-db:5432/bidmart_wallet_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/%2f}
+      BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
+      GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
+      MIDTRANS_SANDBOX_BASE_URL: ${MIDTRANS_SANDBOX_BASE_URL:-https://api.sandbox.midtrans.com}
+      MIDTRANS_SNAP_URL: ${MIDTRANS_SNAP_URL:-https://app.sandbox.midtrans.com/snap/v1/transactions}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-SB-Mid-server-local}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-SB-Mid-client-local}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost}
       AUCTION_SERVICE_BASE_URL: ${WALLET_AUCTION_SERVICE_BASE_URL:-http://auction-service:8082/api/v1/auctions}
+    volumes:
+      - wallet-rust-data:/data
     depends_on:
       wallet-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  order-notification-service:
+    image: ${ORDER_IMAGE:-bidmart-order-and-notification-service:local}
+    build:
+      context: ../bidmart-order-and-notification-service
+    ports:
+      - "${ORDER_PORT:-8084}:8084"
+    env_file:
+      - path: ../bidmart-order-and-notification-service/.env
+        required: false
+      - path: .env
+        required: false
+    environment:
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: ${ORDER_DATABASE_URL:-jdbc:postgresql://order-db:5432/bidmart_order}
+      SPRING_DATASOURCE_USERNAME: ${ORDER_DB_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${ORDER_DB_PASSWORD:-postgres}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${ORDER_DDL_AUTO:-update}
+      SPRING_RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      SPRING_RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
+      APP_INTERNAL_SERVICE_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
+    depends_on:
+      order-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: ${RESTART_POLICY:-unless-stopped}
 
@@ -183,6 +247,28 @@ services:
       retries: 5
     restart: ${RESTART_POLICY:-unless-stopped}
 
+  auction-db:
+    image: postgres:16-alpine
+    ports:
+      - "${AUCTION_DB_PORT:-5436}:5432"
+    env_file:
+      - path: ../bidmart-auction-service-rust/.env
+        required: false
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: bidmart_auction
+      POSTGRES_USER: ${AUCTION_DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${AUCTION_DB_PASSWORD:-postgres}
+    volumes:
+      - auction-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUCTION_DB_USERNAME:-postgres} -d bidmart_auction"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: ${RESTART_POLICY:-unless-stopped}
+
   wallet-db:
     image: postgres:16-alpine
     ports:
@@ -205,6 +291,43 @@ services:
       retries: 5
     restart: ${RESTART_POLICY:-unless-stopped}
 
+  order-db:
+    image: postgres:16-alpine
+    ports:
+      - "${ORDER_DB_PORT:-5437}:5432"
+    env_file:
+      - path: ../bidmart-order-and-notification-service/.env
+        required: false
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: bidmart_order
+      POSTGRES_USER: ${ORDER_DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD:-postgres}
+    volumes:
+      - order-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ORDER_DB_USERNAME:-postgres} -d bidmart_order"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: ${RESTART_POLICY:-unless-stopped}
+
   redis:
     image: redis:7-alpine
     ports:
@@ -224,7 +347,10 @@ services:
 
 volumes:
   auth-db-data:
+  auction-db-data:
   auction-rust-data:
   catalogue-db-data:
+  order-db-data:
   wallet-db-data:
+  wallet-rust-data:
   redis-data:
