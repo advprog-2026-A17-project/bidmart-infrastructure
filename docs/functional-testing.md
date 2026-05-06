@@ -7,10 +7,11 @@ Use the functional smoke suite after the Docker stack is running to avoid repeat
 The full scope exercises the system through the gateway:
 
 - public catalogue search
-- public auction list
+- auction route reachability through the gateway
 - frontend shell reachability
 - seller login
 - buyer login
+- authenticated auction list
 - buyer wallet creation/read
 - Midtrans sandbox top-up intent creation
 - deterministic payment settlement through the wallet simulation endpoint
