@@ -66,6 +66,11 @@ spring:
           predicates:
             - Path=/api/v1/orders/**
 
+        - id: notification-service-api
+          uri: ${ORDER_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/notifications/**
+
 app:
   auth:
     jwt:
