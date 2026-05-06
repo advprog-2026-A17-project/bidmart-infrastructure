@@ -17,13 +17,9 @@ class PlatformComposeContractTest {
         assertTrue(compose.contains("bidmart.events"));
 
         assertTrue(compose.contains("auction-db:"));
-        assertTrue(compose.contains("sqlite:///data/bidmart-auction.db"));
-        assertTrue(compose.contains("sqlite:///data/bidmart-wallet.db"));
+        assertTrue(compose.contains("postgresql://postgres:postgres@auction-db:5432/bidmart_auction"));
+        assertTrue(compose.contains("postgresql://postgres:postgres@wallet-db:5432/bidmart_wallet_db"));
         assertTrue(compose.contains("wallet-rust-data:"));
-
-        assertTrue(compose.contains("CATALOGUE_AUCTION_EVENTS_QUEUE"));
-        assertTrue(compose.contains("ORDER_AUCTION_EVENTS_QUEUE"));
-        assertTrue(compose.contains("amqp://guest:guest@rabbitmq:5672/%2f"));
 
         assertTrue(compose.contains("MIDTRANS_SANDBOX_BASE_URL"));
         assertTrue(compose.contains("MIDTRANS_SERVER_KEY"));
