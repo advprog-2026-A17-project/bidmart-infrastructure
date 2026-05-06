@@ -38,6 +38,13 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+tasks.register<Exec>("functionalSmoke") {
+    group = "verification"
+    description = "Run the BidMart gateway functional smoke suite against a running stack."
+    workingDir = projectDir
+    commandLine("node", "scripts/functional-smoke.mjs")
+}
+
 tasks.jacocoTestReport {
     dependsOn(tasks.test)
     reports {
