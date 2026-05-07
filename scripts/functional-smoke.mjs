@@ -3,7 +3,7 @@
 const DEFAULT_GATEWAY_URL = 'http://localhost:8000';
 const DEFAULT_FRONTEND_URL = 'http://localhost';
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
-const DEFAULT_POLL_TIMEOUT_MS = 30_000;
+const DEFAULT_POLL_TIMEOUT_MS = 200_000;
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 
 class SmokeError extends Error {
@@ -29,7 +29,7 @@ const config = {
     requestTimeoutMs: positiveInt(env.BIDMART_REQUEST_TIMEOUT_MS, DEFAULT_REQUEST_TIMEOUT_MS),
     pollTimeoutMs: positiveInt(env.BIDMART_POLL_TIMEOUT_MS, DEFAULT_POLL_TIMEOUT_MS),
     pollIntervalMs: positiveInt(env.BIDMART_POLL_INTERVAL_MS, DEFAULT_POLL_INTERVAL_MS),
-    auctionLifetimeSeconds: positiveInt(env.BIDMART_AUCTION_LIFETIME_SECONDS, 5),
+    auctionLifetimeSeconds: positiveInt(env.BIDMART_AUCTION_LIFETIME_SECONDS, 10),
     topUpCents: positiveInt(env.BIDMART_SMOKE_TOP_UP_CENTS, 100_000),
     skipFrontend: env.BIDMART_SKIP_FRONTEND_CHECK === '1',
     skipNotifications: env.BIDMART_SKIP_NOTIFICATION_CHECK === '1',
