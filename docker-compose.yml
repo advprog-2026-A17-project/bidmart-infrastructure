@@ -139,7 +139,14 @@ services:
       BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
       GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
       MIDTRANS_SANDBOX_BASE_URL: ${MIDTRANS_SANDBOX_BASE_URL:-https://api.sandbox.midtrans.com}
-      MIDTRANS_SNAP_URL: ${MIDTRANS_SNAP_URL:-https://app.sandbox.midtrans.com/snap/v1/transactions}
+      MIDTRANS_CHARGE_URL: ${MIDTRANS_CHARGE_URL:-https://api.sandbox.midtrans.com/v2/charge}
+      MIDTRANS_STATUS_BASE_URL: ${MIDTRANS_STATUS_BASE_URL:-https://api.sandbox.midtrans.com/v2}
+      MIDTRANS_BCA_VA_SIMULATOR_URL: ${MIDTRANS_BCA_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/bca/va/index}
+      MIDTRANS_BNI_VA_SIMULATOR_URL: ${MIDTRANS_BNI_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/bni/va/index}
+      MIDTRANS_BRI_VA_SIMULATOR_URL: ${MIDTRANS_BRI_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/bri/va/index}
+      MIDTRANS_PERMATA_VA_SIMULATOR_URL: ${MIDTRANS_PERMATA_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/openapi/va/index}
+      MIDTRANS_MANDIRI_BILL_SIMULATOR_URL: ${MIDTRANS_MANDIRI_BILL_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/openapi/mandiri/index}
+      MIDTRANS_QRIS_SIMULATOR_URL: ${MIDTRANS_QRIS_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/qris/index}
       MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-SB-Mid-server-local}
       MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-SB-Mid-client-local}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost}
