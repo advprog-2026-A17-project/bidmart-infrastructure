@@ -29,4 +29,28 @@ class PlatformComposeContractTest {
         assertTrue(gatewayConfig.contains("uri: ${ORDER_SERVICE_URL:http://localhost:8084}"));
         assertTrue(gatewayConfig.contains("Path=/ws/notifications/**"));
     }
+
+    @Test
+    void composeShouldLoadInfrastructureEnvAfterRepoSpecificFallbacks() {
+        String compose = ContractFileReader.read("docker-compose.yml");
+
+        assertTrue(compose.contains("x-env-files:"));
+        assertRepoEnvFallsBackToInfrastructureEnv(compose, "../bidmart-auth-service/.env");
+        assertRepoEnvFallsBackToInfrastructureEnv(compose, "../bidmart-catalogue-service/.env");
+        assertRepoEnvFallsBackToInfrastructureEnv(compose, "../bidmart-auction-service-rust/.env");
+        assertRepoEnvFallsBackToInfrastructureEnv(compose, "../bidmart-wallet-service-rust/.env");
+        assertRepoEnvFallsBackToInfrastructureEnv(compose, "../bidmart-order-and-notification-service/.env");
+        assertRepoEnvFallsBackToInfrastructureEnv(compose, "../bidmart-frontend/.env");
+    }
+
+    private static void assertRepoEnvFallsBackToInfrastructureEnv(String compose, String repoEnvPath) {
+        int repoEnvIndex = compose.indexOf("- path: " + repoEnvPath);
+        int infrastructureEnvIndex = compose.indexOf("- path: .env", repoEnvIndex);
+
+        assertTrue(repoEnvIndex >= 0, "Missing repo-specific fallback env: " + repoEnvPath);
+        assertTrue(
+                infrastructureEnvIndex > repoEnvIndex,
+                "Infrastructure .env must be listed after " + repoEnvPath + " so it has precedence"
+        );
+    }
 }
