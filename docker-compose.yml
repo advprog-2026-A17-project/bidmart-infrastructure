@@ -1,5 +1,43 @@
 name: ${COMPOSE_PROJECT_NAME:-bidmart}
 
+# Compose applies later env_file entries last. Each optional repo-specific .env
+# is a fallback, and the infrastructure .env is loaded last as the stack source
+# of truth.
+x-env-files:
+  gateway: &gateway-env-files
+    - path: .env
+      required: false
+  auth: &auth-env-files
+    - path: ../bidmart-auth-service/.env
+      required: false
+    - path: .env
+      required: false
+  catalogue: &catalogue-env-files
+    - path: ../bidmart-catalogue-service/.env
+      required: false
+    - path: .env
+      required: false
+  auction: &auction-env-files
+    - path: ../bidmart-auction-service-rust/.env
+      required: false
+    - path: .env
+      required: false
+  wallet: &wallet-env-files
+    - path: ../bidmart-wallet-service-rust/.env
+      required: false
+    - path: .env
+      required: false
+  order: &order-env-files
+    - path: ../bidmart-order-and-notification-service/.env
+      required: false
+    - path: .env
+      required: false
+  frontend: &frontend-env-files
+    - path: ../bidmart-frontend/.env
+      required: false
+    - path: .env
+      required: false
+
 services:
   gateway:
     image: ${GATEWAY_IMAGE:-bidmart-gateway:local}
@@ -7,11 +45,7 @@ services:
       context: .
     ports:
       - "${GATEWAY_PORT:-8000}:8000"
-    env_file:
-      - path: ../bidmart-frontend/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *gateway-env-files
     environment:
       PORT: 8000
       AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:8080}
@@ -33,11 +67,7 @@ services:
       context: ../bidmart-auth-service
     ports:
       - "${AUTH_PORT:-8080}:8080"
-    env_file:
-      - path: ../bidmart-auth-service/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *auth-env-files
     environment:
       SPRING_DATASOURCE_URL: ${AUTH_DATABASE_URL:-jdbc:postgresql://auth-db:5432/bidmart_auth}
       SPRING_DATASOURCE_USERNAME: ${AUTH_DB_USERNAME:-postgres}
@@ -68,11 +98,7 @@ services:
       context: ../bidmart-catalogue-service
     ports:
       - "${CATALOGUE_PORT:-8081}:8081"
-    env_file:
-      - path: ../bidmart-catalogue-service/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *catalogue-env-files
     environment:
       SPRING_DATASOURCE_URL: ${CATALOGUE_DATABASE_URL:-jdbc:postgresql://catalogue-db:5432/bidmart_catalogue}
       SPRING_DATASOURCE_USERNAME: ${CATALOGUE_DB_USERNAME:-postgres}
@@ -96,11 +122,7 @@ services:
       context: ../bidmart-auction-service-rust
     ports:
       - "${AUCTION_PORT:-8082}:8082"
-    env_file:
-      - path: ../bidmart-auction-service-rust/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *auction-env-files
     environment:
       BIND_ADDRESS: 0.0.0.0:8082
       DATABASE_URL: ${AUCTION_DATABASE_URL:-postgresql://postgres:postgres@auction-db:5432/bidmart_auction}
@@ -128,11 +150,7 @@ services:
       context: ../bidmart-wallet-service-rust
     ports:
       - "${WALLET_PORT:-8083}:8083"
-    env_file:
-      - path: ../bidmart-wallet-service-rust/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *wallet-env-files
     environment:
       DATABASE_URL: ${WALLET_DATABASE_URL:-postgresql://postgres:postgres@wallet-db:5432/bidmart_wallet_db}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/%2f}
@@ -166,11 +184,7 @@ services:
       context: ../bidmart-order-and-notification-service
     ports:
       - "${ORDER_PORT:-8084}:8084"
-    env_file:
-      - path: ../bidmart-order-and-notification-service/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *order-env-files
     environment:
       SERVER_PORT: 8084
       SPRING_DATASOURCE_URL: ${ORDER_DATABASE_URL:-jdbc:postgresql://order-db:5432/bidmart_order}
@@ -197,11 +211,7 @@ services:
       args:
         VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-}
         VITE_GOOGLE_CLIENT_ID: ${OAUTH_GOOGLE_CLIENT_ID:-}
-    env_file:
-      - path: ../bidmart-frontend/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *frontend-env-files
     environment:
       PORT: 80
     ports:
@@ -214,11 +224,7 @@ services:
     image: postgres:16-alpine
     ports:
       - "${AUTH_DB_PORT:-5434}:5432"
-    env_file:
-      - path: ../bidmart-auth-service/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *auth-env-files
     environment:
       POSTGRES_DB: bidmart_auth
       POSTGRES_USER: ${AUTH_DB_USERNAME:-postgres}
@@ -236,11 +242,7 @@ services:
     image: postgres:16-alpine
     ports:
       - "${CATALOGUE_DB_PORT:-5435}:5432"
-    env_file:
-      - path: ../bidmart-catalogue-service/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *catalogue-env-files
     environment:
       POSTGRES_DB: bidmart_catalogue
       POSTGRES_USER: ${CATALOGUE_DB_USERNAME:-postgres}
@@ -258,11 +260,7 @@ services:
     image: postgres:16-alpine
     ports:
       - "${AUCTION_DB_PORT:-5436}:5432"
-    env_file:
-      - path: ../bidmart-auction-service-rust/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *auction-env-files
     environment:
       POSTGRES_DB: bidmart_auction
       POSTGRES_USER: ${AUCTION_DB_USERNAME:-postgres}
@@ -280,11 +278,7 @@ services:
     image: postgres:16-alpine
     ports:
       - "${WALLET_DB_PORT:-5433}:5432"
-    env_file:
-      - path: ../bidmart-wallet-service-rust/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *wallet-env-files
     environment:
       POSTGRES_DB: bidmart_wallet_db
       POSTGRES_USER: ${WALLET_DB_USERNAME:-postgres}
@@ -302,11 +296,7 @@ services:
     image: postgres:16-alpine
     ports:
       - "${ORDER_DB_PORT:-5437}:5432"
-    env_file:
-      - path: ../bidmart-order-and-notification-service/.env
-        required: false
-      - path: .env
-        required: false
+    env_file: *order-env-files
     environment:
       POSTGRES_DB: bidmart_order
       POSTGRES_USER: ${ORDER_DB_USERNAME:-postgres}
