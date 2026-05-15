@@ -87,6 +87,14 @@ async function main() {
     const seller = await step('seller can log in', () => authenticateActor('SELLER'));
     const buyer = await step('buyer can log in', () => authenticateActor('BUYER'));
 
+    // Attempt to run admin-only checks when admin credentials are provided.
+    let admin = null;
+    try {
+        admin = await step('admin can log in', async () => await authenticateActor('ADMIN'));
+    } catch (err) {
+        console.log('Skipping admin checks: admin credentials not provided or login failed.');
+    }
+
     await step('authenticated auction listing endpoint is reachable', () => {
         return api('/api/v1/auctions', {
             actor: buyer,
@@ -110,6 +118,15 @@ async function main() {
 
     if (!config.skipNotifications) {
         await step('buyer receives an auction notification', () => waitForAuctionNotification(buyer, auction.id));
+    }
+
+    // If admin credentials were provided, validate an admin-only endpoint
+    if (admin) {
+        await step('admin can access diagnostics', () => api('/api/v1/auth/diagnostics/policies', {
+            actor: admin,
+            expectedStatuses: [200],
+            label: 'admin diagnostics',
+        }));
     }
 
     console.log('');
@@ -162,6 +179,11 @@ async function authenticateActor(role) {
         token: payload.accessToken,
         user: payload.user,
     };
+}
+
+// If admin is available, validate an admin-only endpoint
+if (typeof main !== 'undefined') {
+    // The main flow will call admin-specific checks where appropriate.
 }
 
 async function ensureWallet(actor) {

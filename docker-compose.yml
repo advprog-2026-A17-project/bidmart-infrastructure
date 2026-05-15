@@ -167,6 +167,9 @@ services:
       MIDTRANS_QRIS_SIMULATOR_URL: ${MIDTRANS_QRIS_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/qris/index}
       MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-SB-Mid-server-local}
       MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-SB-Mid-client-local}
+      MIDTRANS_IRIS_BASE_URL: ${MIDTRANS_IRIS_BASE_URL:-https://app.sandbox.midtrans.com/iris/api/v1}
+      MIDTRANS_IRIS_API_KEY: ${MIDTRANS_IRIS_API_KEY:-IRIS-api-key-local}
+      MIDTRANS_IRIS_MERCHANT_KEY: ${MIDTRANS_IRIS_MERCHANT_KEY:-IRIS-merchant-key-local}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost}
       AUCTION_SERVICE_BASE_URL: ${WALLET_AUCTION_SERVICE_BASE_URL:-http://auction-service:8082/api/v1/auctions}
     volumes:

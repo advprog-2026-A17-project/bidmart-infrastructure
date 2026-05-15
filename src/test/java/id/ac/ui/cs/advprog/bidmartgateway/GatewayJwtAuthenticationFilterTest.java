@@ -40,7 +40,7 @@ class GatewayJwtAuthenticationFilterTest {
                 INTERNAL_TOKEN
         );
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/v1/auctions")
+                MockServerHttpRequest.post("/api/v1/auctions")
         );
 
         filter.filter(exchange, successChain()).block();
@@ -59,7 +59,7 @@ class GatewayJwtAuthenticationFilterTest {
         String token = token("user-1", "buyer@test.com", List.of("BUYER"));
         AtomicReference<ServerWebExchange> forwardedExchange = new AtomicReference<>();
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/v1/auctions")
+                MockServerHttpRequest.get("/api/v1/orders")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .header("X-User-Id", "spoofed-user")
                         .header("X-User-Email", "spoofed@test.com")
@@ -88,7 +88,7 @@ class GatewayJwtAuthenticationFilterTest {
         String token = token("user-1", "buyer@test.com", List.of("BUYER"));
         AtomicReference<ServerWebExchange> forwardedExchange = new AtomicReference<>();
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/v1/auctions")
+                MockServerHttpRequest.get("/api/v1/orders")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .header("X-Correlation-Id", "request-123")
         );
@@ -134,6 +134,74 @@ class GatewayJwtAuthenticationFilterTest {
 
         assertEquals("/api/v1/catalogue/listings/search", forwardedExchange.get().getRequest().getURI().getPath());
         assertNull(exchange.getResponse().getStatusCode());
+    }
+
+    @Test
+    void catalogueReadRoutesShouldBePublicWithoutJwt() {
+        GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(
+                permissionClient(true),
+                ROUTE_PERMISSION_POLICY,
+                SECRET,
+                INTERNAL_TOKEN
+        );
+
+        AtomicReference<ServerWebExchange> listExchange = new AtomicReference<>();
+        MockServerWebExchange listRequest = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/catalogue/listings")
+                        .header("X-User-Id", "spoofed-user")
+        );
+        filter.filter(listRequest, captureChain(listExchange)).block();
+
+        assertEquals("/api/v1/catalogue/listings", listExchange.get().getRequest().getURI().getPath());
+        assertNull(listExchange.get().getRequest().getHeaders().getFirst("X-User-Id"));
+        assertNull(listRequest.getResponse().getStatusCode());
+
+        AtomicReference<ServerWebExchange> detailExchange = new AtomicReference<>();
+        MockServerWebExchange detailRequest = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/catalogue/listings/listing-1")
+        );
+        filter.filter(detailRequest, captureChain(detailExchange)).block();
+
+        assertEquals("/api/v1/catalogue/listings/listing-1", detailExchange.get().getRequest().getURI().getPath());
+        assertNull(detailRequest.getResponse().getStatusCode());
+
+        AtomicReference<ServerWebExchange> summaryExchange = new AtomicReference<>();
+        MockServerWebExchange summaryRequest = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/catalogue/listings/listing-1/summary")
+        );
+        filter.filter(summaryRequest, captureChain(summaryExchange)).block();
+
+        assertEquals("/api/v1/catalogue/listings/listing-1/summary", summaryExchange.get().getRequest().getURI().getPath());
+        assertNull(summaryRequest.getResponse().getStatusCode());
+    }
+
+    @Test
+    void auctionReadRoutesShouldBePublicWithoutJwt() {
+        GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(
+                permissionClient(true),
+                ROUTE_PERMISSION_POLICY,
+                SECRET,
+                INTERNAL_TOKEN
+        );
+        AtomicReference<ServerWebExchange> listExchange = new AtomicReference<>();
+        MockServerWebExchange listRequest = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/auctions")
+                        .header("X-User-Id", "spoofed-user")
+        );
+        filter.filter(listRequest, captureChain(listExchange)).block();
+
+        assertEquals("/api/v1/auctions", listExchange.get().getRequest().getURI().getPath());
+        assertNull(listExchange.get().getRequest().getHeaders().getFirst("X-User-Id"));
+        assertNull(listRequest.getResponse().getStatusCode());
+
+        AtomicReference<ServerWebExchange> detailExchange = new AtomicReference<>();
+        MockServerWebExchange detailRequest = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/auctions/auction-1")
+        );
+        filter.filter(detailRequest, captureChain(detailExchange)).block();
+
+        assertEquals("/api/v1/auctions/auction-1", detailExchange.get().getRequest().getURI().getPath());
+        assertNull(detailRequest.getResponse().getStatusCode());
     }
 
     private AuthPermissionClient permissionClient(boolean allowed) {

@@ -152,15 +152,35 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
     private boolean isPublicRoute(HttpMethod method, String path) {
         return HttpMethod.OPTIONS.equals(method) || 
                path.startsWith("/api/v1/auth/") || 
-               isPublicCatalogueSearch(method, path) ||
+               isPublicCatalogueRead(method, path) ||
+               isPublicAuctionRead(method, path) ||
                path.equals("/ws") || 
                path.startsWith("/ws/");
     }
 
-    private boolean isPublicCatalogueSearch(HttpMethod method, String path) {
-        return HttpMethod.GET.equals(method)
-                && (path.equals("/api/v1/catalogue/listings/search")
-                || path.equals("/api/v1/catalogue/listings/search/"));
+    private boolean isPublicCatalogueRead(HttpMethod method, String path) {
+        if (!HttpMethod.GET.equals(method)) {
+            return false;
+        }
+        String normalized = path.endsWith("/") && path.length() > 1
+                ? path.substring(0, path.length() - 1)
+                : path;
+        return normalized.equals("/api/v1/catalogue/listings")
+                || normalized.equals("/api/v1/catalogue/listings/search")
+                || normalized.matches("^/api/v1/catalogue/listings/[^/]+$")
+                || normalized.matches("^/api/v1/catalogue/listings/[^/]+/summary$");
+    }
+
+    private boolean isPublicAuctionRead(HttpMethod method, String path) {
+        if (!HttpMethod.GET.equals(method)) {
+            return false;
+        }
+        String normalized = path.endsWith("/") && path.length() > 1
+                ? path.substring(0, path.length() - 1)
+                : path;
+        return normalized.equals("/api/v1/auctions")
+                || normalized.matches("^/api/v1/auctions/[^/]+$")
+                || normalized.matches("^/api/v1/auctions/[^/]+/bids$");
     }
 
     private Mono<Void> reject(ServerWebExchange exchange, HttpStatus status) {
