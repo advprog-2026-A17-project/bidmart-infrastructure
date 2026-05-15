@@ -7,6 +7,17 @@ import org.springframework.stereotype.Component;
 public class RoutePermissionPolicy {
 
     public String requiredPermission(HttpMethod method, String path) {
+        // Admin routes
+        if (path.startsWith("/api/v1/auth/admin/")) {
+            return "admin:users";
+        }
+        if (matchesExact(path, "/api/v1/auth/roles") || matchesChildAction(path, "/api/v1/auth/users", "roles")) {
+            return "admin:roles";
+        }
+        if (path.startsWith("/api/v1/auth/diagnostics")) {
+            return "admin:users";
+        }
+
         if (HttpMethod.POST.equals(method) && matchesExact(path, "/api/v1/auctions")) {
             return "auction:create";
         }
