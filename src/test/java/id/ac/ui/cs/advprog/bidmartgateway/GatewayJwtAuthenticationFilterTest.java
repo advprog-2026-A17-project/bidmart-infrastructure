@@ -48,6 +48,7 @@ class GatewayJwtAuthenticationFilterTest {
         assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
     }
 
+
     @Test
     void protectedRouteShouldForwardVerifiedIdentityAndStripSpoofedHeaders() {
         GatewayJwtAuthenticationFilter filter = new GatewayJwtAuthenticationFilter(

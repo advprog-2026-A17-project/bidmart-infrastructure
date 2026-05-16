@@ -58,6 +58,19 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
             return chain.filter(stripIdentityHeaders(exchange));
         }
 
+        // Optionally-authenticated routes: allow through with or without token,
+        // but forward identity if a valid token is present (e.g. GET catalogue)
+        if (isOptionallyAuthenticatedRoute(request.getMethod(), path)) {
+            Claims claims = parseAccessClaims(request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION));
+            if (claims != null) {
+                String email = claims.get("email", String.class);
+                if (email != null && !email.isBlank()) {
+                    return chain.filter(withVerifiedIdentity(exchange, claims));
+                }
+            }
+            return chain.filter(stripIdentityHeaders(exchange));
+        }
+
         Claims claims = parseAccessClaims(request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION));
         if (claims == null) {
             return reject(exchange, HttpStatus.UNAUTHORIZED);
@@ -152,10 +165,17 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
     private boolean isPublicRoute(HttpMethod method, String path) {
         return HttpMethod.OPTIONS.equals(method) || 
                path.startsWith("/api/v1/auth/") || 
-               isPublicCatalogueRead(method, path) ||
-               isPublicAuctionRead(method, path) ||
                path.equals("/ws") || 
                path.startsWith("/ws/");
+    }
+
+    /**
+     * Routes that do not require authentication but should forward identity
+     * headers when a valid token is present. This allows public browsing
+     * of catalogue and auction listings while still providing user context.
+     */
+    private boolean isOptionallyAuthenticatedRoute(HttpMethod method, String path) {
+        return isPublicCatalogueRead(method, path) || isPublicAuctionRead(method, path);
     }
 
     private boolean isPublicCatalogueRead(HttpMethod method, String path) {
