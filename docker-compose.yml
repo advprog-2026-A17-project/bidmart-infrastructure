@@ -209,17 +209,20 @@ services:
     restart: ${RESTART_POLICY:-unless-stopped}
 
   frontend:
-    image: ${FRONTEND_IMAGE:-bidmart-frontend:local}
-    build:
-      context: ../bidmart-frontend
-      args:
-        VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-}
-        VITE_GOOGLE_CLIENT_ID: ${OAUTH_GOOGLE_CLIENT_ID:-}
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     env_file: *frontend-env-files
     environment:
-      PORT: 80
+      VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-}
+      VITE_GOOGLE_CLIENT_ID: ${OAUTH_GOOGLE_CLIENT_ID:-}
+      CHOKIDAR_USEPOLLING: ${FRONTEND_CHOKIDAR_USEPOLLING:-true}
+      WATCHPACK_POLLING: ${FRONTEND_WATCHPACK_POLLING:-true}
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ../bidmart-frontend:/app
+      - frontend-node-modules:/app/node_modules
     depends_on:
       - gateway
     restart: ${RESTART_POLICY:-unless-stopped}
@@ -357,3 +360,4 @@ volumes:
   wallet-rust-data:
   redis-data:
   rabbitmq-data:
+  frontend-node-modules:
