@@ -17,6 +17,7 @@ spring:
               - GET
               - POST
               - PUT
+              - PATCH
               - DELETE
               - OPTIONS
             allowedHeaders: "*"
@@ -69,7 +70,7 @@ spring:
         - id: notification-service-api
           uri: ${ORDER_SERVICE_URL:http://localhost:8084}
           predicates:
-            - Path=/api/v1/notifications/**
+            - Path=/api/v1/notifications,/api/v1/notifications/**
 
 app:
   auth:
