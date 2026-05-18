@@ -11,7 +11,8 @@ class GatewayCatalogueIntegrationContractTest {
         String yaml = ContractFileReader.read("src/main/resources/application.yml");
 
         assertTrue(yaml.contains("- id: catalogue-service"));
-        assertTrue(yaml.contains("uri: ${CATALOGUE_SERVICE_URL:http://catalogue-service:8081}"));
+        assertTrue(yaml.contains("uri: ${GATEWAY_CATALOGUE_SERVICE_URL:lb://catalogue-service}"));
+        assertTrue(yaml.contains("CATALOGUE_SERVICE_INSTANCE_0:http://catalogue-service:8081"));
         assertTrue(yaml.contains("Path=/api/v1/catalogue/**"));
     }
 }

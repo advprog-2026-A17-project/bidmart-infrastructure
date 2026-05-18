@@ -48,11 +48,13 @@ services:
     env_file: *gateway-env-files
     environment:
       PORT: 8000
-      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:8080}
-      CATALOGUE_SERVICE_URL: ${CATALOGUE_SERVICE_URL:-http://catalogue-service:8081}
-      AUCTION_SERVICE_URL: ${AUCTION_SERVICE_URL:-http://auction-service:8082}
-      WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
-      ORDER_SERVICE_URL: ${ORDER_SERVICE_URL:-http://order-notification-service:8084}
+      GATEWAY_AUTH_WS_SERVICE_URL: ${GATEWAY_AUTH_WS_SERVICE_URL:-lb:ws://auth-service}
+      GATEWAY_ORDER_WS_SERVICE_URL: ${GATEWAY_ORDER_WS_SERVICE_URL:-lb:ws://order-notification-service}
+      GATEWAY_AUTH_SERVICE_URL: ${GATEWAY_AUTH_SERVICE_URL:-lb://auth-service}
+      GATEWAY_CATALOGUE_SERVICE_URL: ${GATEWAY_CATALOGUE_SERVICE_URL:-lb://catalogue-service}
+      GATEWAY_AUCTION_SERVICE_URL: ${GATEWAY_AUCTION_SERVICE_URL:-lb://auction-service}
+      GATEWAY_WALLET_SERVICE_URL: ${GATEWAY_WALLET_SERVICE_URL:-lb://wallet-service}
+      GATEWAY_ORDER_SERVICE_URL: ${GATEWAY_ORDER_SERVICE_URL:-lb://order-notification-service}
     depends_on:
       - auth-service
       - catalogue-service
@@ -65,8 +67,8 @@ services:
     image: ${AUTH_IMAGE:-bidmart-auth-service:local}
     build:
       context: ../bidmart-auth-service
-    ports:
-      - "${AUTH_PORT:-8080}:8080"
+    expose:
+      - "8080"
     env_file: *auth-env-files
     environment:
       SPRING_DATASOURCE_URL: ${AUTH_DATABASE_URL:-jdbc:postgresql://auth-db:5432/bidmart_auth}
@@ -96,8 +98,8 @@ services:
     image: ${CATALOGUE_IMAGE:-bidmart-catalogue-service:local}
     build:
       context: ../bidmart-catalogue-service
-    ports:
-      - "${CATALOGUE_PORT:-8081}:8081"
+    expose:
+      - "8081"
     env_file: *catalogue-env-files
     environment:
       SPRING_DATASOURCE_URL: ${CATALOGUE_DATABASE_URL:-jdbc:postgresql://catalogue-db:5432/bidmart_catalogue}
@@ -120,8 +122,8 @@ services:
     image: ${AUCTION_IMAGE:-bidmart-auction-service-rust:local}
     build:
       context: ../bidmart-auction-service-rust
-    ports:
-      - "${AUCTION_PORT:-8082}:8082"
+    expose:
+      - "8082"
     env_file: *auction-env-files
     environment:
       BIND_ADDRESS: 0.0.0.0:8082
@@ -148,8 +150,8 @@ services:
     image: ${WALLET_IMAGE:-bidmart-wallet-service-rust:local}
     build:
       context: ../bidmart-wallet-service-rust
-    ports:
-      - "${WALLET_PORT:-8083}:8083"
+    expose:
+      - "8083"
     env_file: *wallet-env-files
     environment:
       DATABASE_URL: ${WALLET_DATABASE_URL:-postgresql://postgres:postgres@wallet-db:5432/bidmart_wallet_db}
@@ -186,8 +188,8 @@ services:
     image: ${ORDER_IMAGE:-bidmart-order-and-notification-service:local}
     build:
       context: ../bidmart-order-and-notification-service
-    ports:
-      - "${ORDER_PORT:-8084}:8084"
+    expose:
+      - "8084"
     env_file: *order-env-files
     environment:
       SERVER_PORT: 8084

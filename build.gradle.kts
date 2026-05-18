@@ -21,6 +21,7 @@ extra["springCloudVersion"] = "2023.0.1"
 
 dependencies {
     implementation("org.springframework.cloud:spring-cloud-starter-gateway")
+    implementation("org.springframework.cloud:spring-cloud-starter-loadbalancer")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     implementation("io.jsonwebtoken:jjwt-api:0.12.5")

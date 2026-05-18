@@ -5,6 +5,23 @@ spring:
   application:
     name: bidmart-gateway
   cloud:
+    discovery:
+      client:
+        simple:
+          instances:
+            auth-service:
+              - uri: ${AUTH_SERVICE_INSTANCE_0:http://auth-service:8080}
+            catalogue-service:
+              - uri: ${CATALOGUE_SERVICE_INSTANCE_0:http://catalogue-service:8081}
+            auction-service:
+              - uri: ${AUCTION_SERVICE_INSTANCE_0:http://auction-service:8082}
+            wallet-service:
+              - uri: ${WALLET_SERVICE_INSTANCE_0:http://wallet-service:8083}
+            order-notification-service:
+              - uri: ${ORDER_SERVICE_INSTANCE_0:http://order-notification-service:8084}
+    loadbalancer:
+      retry:
+        enabled: true
     gateway:
       # Centralized CORS Configuration
       globalcors:
@@ -28,14 +45,14 @@ spring:
       routes:
         # WebSocket Route
         - id: notification-service-ws
-          uri: ${ORDER_SERVICE_URL:http://order-notification-service:8084}
+          uri: ${GATEWAY_ORDER_WS_SERVICE_URL:lb:ws://order-notification-service}
           predicates:
             - Path=/ws/notifications/**
           filters:
             - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
 
         - id: auth-service-ws
-          uri: ${AUTH_SERVICE_URL:http://auth-service:8080}
+          uri: ${GATEWAY_AUTH_WS_SERVICE_URL:lb:ws://auth-service}
           predicates:
             - Path=/ws/**
           filters:
@@ -43,32 +60,32 @@ spring:
             
         # Standard HTTP Routes
         - id: auth-service
-          uri: ${AUTH_SERVICE_URL:http://auth-service:8080}
+          uri: ${GATEWAY_AUTH_SERVICE_URL:lb://auth-service}
           predicates:
             - Path=/api/v1/auth/**
             
         - id: catalogue-service
-          uri: ${CATALOGUE_SERVICE_URL:http://catalogue-service:8081}
+          uri: ${GATEWAY_CATALOGUE_SERVICE_URL:lb://catalogue-service}
           predicates:
             - Path=/api/v1/catalogue/**
             
         - id: auction-service
-          uri: ${AUCTION_SERVICE_URL:http://auction-service:8082}
+          uri: ${GATEWAY_AUCTION_SERVICE_URL:lb://auction-service}
           predicates:
             - Path=/api/v1/auctions/**
             
         - id: wallet-service
-          uri: ${WALLET_SERVICE_URL:http://wallet-service:8083}
+          uri: ${GATEWAY_WALLET_SERVICE_URL:lb://wallet-service}
           predicates:
             - Path=/api/v1/wallet/**
             
         - id: order-service
-          uri: ${ORDER_SERVICE_URL:http://order-notification-service:8084}
+          uri: ${GATEWAY_ORDER_SERVICE_URL:lb://order-notification-service}
           predicates:
             - Path=/api/v1/orders,/api/v1/orders/**
 
         - id: notification-service-api
-          uri: ${ORDER_SERVICE_URL:http://order-notification-service:8084}
+          uri: ${GATEWAY_ORDER_SERVICE_URL:lb://order-notification-service}
           predicates:
             - Path=/api/v1/notifications,/api/v1/notifications/**
 
