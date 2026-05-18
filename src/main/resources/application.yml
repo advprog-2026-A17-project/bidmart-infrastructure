@@ -69,10 +69,15 @@ spring:
           predicates:
             - Path=/api/v1/catalogue/**
             
-        - id: auction-service
+        - id: bidding-service
           uri: ${GATEWAY_AUCTION_SERVICE_URL:lb://auction-service}
           predicates:
-            - Path=/api/v1/auctions/**
+            - Path=/api/v1/listings,/api/v1/listings/**
+
+        - id: auction-service-legacy
+          uri: ${GATEWAY_AUCTION_SERVICE_URL:lb://auction-service}
+          predicates:
+            - Path=/api/v1/auctions,/api/v1/auctions/**
             
         - id: wallet-service
           uri: ${GATEWAY_WALLET_SERVICE_URL:lb://wallet-service}

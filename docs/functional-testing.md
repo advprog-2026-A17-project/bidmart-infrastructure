@@ -7,22 +7,28 @@ Use the functional smoke suite after the Docker stack is running to avoid repeat
 The full scope exercises the system through the gateway:
 
 - public catalogue search
-- auction route reachability through the gateway
+- bidding route reachability (`/api/v1/listings`) and legacy alias (`/api/v1/auctions`)
 - frontend shell reachability
-- seller login
-- buyer login
-- authenticated auction list
-- buyer wallet creation/read
-- Midtrans sandbox top-up intent creation
-- deterministic payment settlement through the wallet simulation endpoint
-- seller listing create and publish
-- English auction create
-- catalogue auction-created lifecycle transition
-- buyer bid placement with wallet hold
-- auction close after the configured end time
-- buyer notification delivery
+- seller and buyer login
+- buyer wallet creation/read and sandbox top-up
+- seller listing create (with auction timing fields) and publish
+- bidding session registration (`POST /api/v1/listings`, id = `listingId`)
+- buyer bid placement with wallet hold (`POST /api/v1/listings/{id}/bids`)
+- catalogue price sync after bid (async MQ → catalogue `currentPrice`)
+- listing settlement after end time (`POST /api/v1/listings/{id}/close`)
+- buyer notification delivery (optional)
 
-The suite is API-level, not browser UI automation. The frontend still uses the Midtrans web sandbox redirect; the suite uses the backend simulation endpoint so the run is deterministic and does not require clicking inside Midtrans.
+The suite is API-level, not browser UI automation.
+
+## Listing-as-auction flow under test
+
+```text
+Catalogue:  POST /catalogue/listings → POST .../publish (ACTIVE)
+Bidding:    POST /listings { listingId }  (session id = listing id)
+Buyer:      POST /listings/{id}/bids
+Catalogue:  GET /catalogue/listings/{id}  (currentPrice, hasBids)
+Seller:     POST /listings/{id}/close      (settlement)
+```
 
 ## Run
 
@@ -38,15 +44,13 @@ Or through Gradle:
 ./gradlew functionalSmoke
 ```
 
-For a public-only readiness check that does not require accounts:
+Public-only readiness (no accounts):
 
 ```bash
 BIDMART_SMOKE_SCOPE=public node scripts/functional-smoke.mjs
 ```
 
-## Required Full-Scope Environment
-
-Use verified demo accounts. Freshly registered accounts may fail login until email verification is complete.
+## Required full-scope environment
 
 ```bash
 export BIDMART_SELLER_EMAIL=seller@example.com
@@ -55,14 +59,14 @@ export BIDMART_BUYER_EMAIL=buyer@example.com
 export BIDMART_BUYER_PASSWORD='password'
 ```
 
-If an account has 2FA enabled, also set:
+Optional 2FA:
 
 ```bash
 export BIDMART_SELLER_2FA_CODE=123456
 export BIDMART_BUYER_2FA_CODE=123456
 ```
 
-You can skip login and supply existing tokens instead:
+Or supply tokens:
 
 ```bash
 export BIDMART_SELLER_TOKEN='...'
@@ -71,7 +75,7 @@ export BIDMART_BUYER_TOKEN='...'
 export BIDMART_BUYER_USER_ID='...'
 ```
 
-## Optional Configuration
+## Optional configuration
 
 ```bash
 export BIDMART_GATEWAY_URL=http://localhost:8000
@@ -83,18 +87,14 @@ export BIDMART_SKIP_FRONTEND_CHECK=1
 export BIDMART_SKIP_NOTIFICATION_CHECK=1
 ```
 
-If the browser normally calls `http://localhost/api/...` through the frontend proxy, set:
+If the browser uses the frontend proxy at `http://localhost`, set `BIDMART_GATEWAY_URL=http://localhost`.
 
-```bash
-export BIDMART_GATEWAY_URL=http://localhost
-```
-
-## Expected Stack State
-
-Start the stack before running the suite:
+## Expected stack state
 
 ```bash
 docker compose up -d --build
 ```
 
-The suite expects RabbitMQ, PostgreSQL databases, gateway routes, wallet, catalogue, auction, order/notification, auth, and frontend services to be healthy enough to receive traffic.
+Requires RabbitMQ, PostgreSQL, gateway, wallet, catalogue, auction (Rust), order/notification, auth, and frontend services healthy enough to receive traffic.
+
+Run catalogue migration **V10** (`minimum_increment`, `start_time`) before full-scope smoke if the catalogue DB was created before the listing-as-auction refactor.

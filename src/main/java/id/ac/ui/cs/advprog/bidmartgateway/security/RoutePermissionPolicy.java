@@ -18,13 +18,13 @@ public class RoutePermissionPolicy {
             return "admin:users";
         }
 
-        if (HttpMethod.POST.equals(method) && matchesExact(path, "/api/v1/auctions")) {
+        if (HttpMethod.POST.equals(method) && (matchesExact(path, "/api/v1/auctions") || matchesExact(path, "/api/v1/listings"))) {
             return "auction:create";
         }
-        if (HttpMethod.POST.equals(method) && matchesChildAction(path, "/api/v1/auctions", "bids")) {
+        if (HttpMethod.POST.equals(method) && (matchesChildAction(path, "/api/v1/auctions", "bids") || matchesChildAction(path, "/api/v1/listings", "bids"))) {
             return "bid:place";
         }
-        if (HttpMethod.POST.equals(method) && matchesChildAction(path, "/api/v1/auctions", "close")) {
+        if (HttpMethod.POST.equals(method) && (matchesChildAction(path, "/api/v1/auctions", "close") || matchesChildAction(path, "/api/v1/listings", "close"))) {
             return "auction:close";
         }
         // Catalogue listing mutations
@@ -56,8 +56,7 @@ public class RoutePermissionPolicy {
      *   DELETE /api/v1/catalogue/listings/{id}
      *   POST   /api/v1/catalogue/listings/{id}/publish
      *   POST   /api/v1/catalogue/listings/{id}/cancel
-     *   POST   /api/v1/catalogue/listings/{id}/auction-created
-     *   POST   /api/v1/catalogue/listings/{id}/sold
+     *   POST   /api/v1/catalogue/listings/{id}/won
      *   POST   /api/v1/catalogue/listings/{id}/unsold
      */
     private boolean isCatalogueMutationRoute(HttpMethod method, String path) {

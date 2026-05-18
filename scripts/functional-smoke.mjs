@@ -65,10 +65,17 @@ async function main() {
         return api('/api/v1/catalogue/listings/search?page=0&size=1');
     });
 
-    await step('auction listing route is reachable through the gateway', () => {
+    await step('bidding listing route is reachable through the gateway', () => {
+        return api('/api/v1/listings', {
+            expectedStatuses: [200, 401, 403],
+            label: 'unauthenticated bidding listing route',
+        });
+    });
+
+    await step('legacy auction route alias remains reachable', () => {
         return api('/api/v1/auctions', {
             expectedStatuses: [200, 401, 403],
-            label: 'unauthenticated auction listing route',
+            label: 'unauthenticated legacy auction route',
         });
     });
 
@@ -95,10 +102,10 @@ async function main() {
         console.log('Skipping admin checks: admin credentials not provided or login failed.');
     }
 
-    await step('authenticated auction listing endpoint is reachable', () => {
-        return api('/api/v1/auctions', {
+    await step('authenticated bidding listing endpoint is reachable', () => {
+        return api('/api/v1/listings', {
             actor: buyer,
-            label: 'authenticated auction listing',
+            label: 'authenticated bidding listing',
         });
     });
 
@@ -108,16 +115,22 @@ async function main() {
     const listing = await step('seller can create a catalogue listing', () => createListing(seller));
     await step('seller can publish the listing', () => publishListing(seller, listing.id));
 
-    const auction = await step('seller can create an English auction', () => createAuction(seller, listing.id));
-    await step('catalogue can mark the listing auction-created', () => markAuctionCreated(seller, listing.id));
+    const session = await step('seller can register the bidding session for the listing', () => registerBiddingSession(seller, listing.id));
+    if (session.id !== listing.id) {
+        throw new SmokeError('Bidding session id must match catalogue listing id.', {
+            listingId: listing.id,
+            sessionId: session.id,
+        });
+    }
 
-    await step('buyer can place a bid backed by wallet hold', () => placeBid(buyer, auction.id));
-    await step('auction can close after its end time', () => closeAuctionAfterEnd(seller, auction.id));
+    await step('buyer can place a bid backed by wallet hold', () => placeBid(buyer, listing.id));
+    await step('catalogue reflects bid price update', () => waitForListingPrice(listing.id, 505));
+    await step('listing can settle after its end time', () => closeListingAfterEnd(seller, listing.id));
 
     await step('buyer wallet detail remains readable after auction lifecycle', () => ensureWallet(buyer));
 
     if (!config.skipNotifications) {
-        await step('buyer receives an auction notification', () => waitForAuctionNotification(buyer, auction.id));
+        await step('buyer receives an auction notification', () => waitForAuctionNotification(buyer, listing.id));
     }
 
     // If admin credentials were provided, validate an admin-only endpoint
@@ -132,7 +145,7 @@ async function main() {
     console.log('');
     console.log('Functional smoke passed.');
     console.log(`Created listing: ${state.createdListingId}`);
-    console.log(`Created auction: ${state.createdAuctionId}`);
+    console.log(`Bidding session: ${state.createdAuctionId ?? state.createdListingId}`);
 }
 
 async function authenticateActor(role) {
@@ -255,6 +268,9 @@ async function topUpBuyerWallet(buyer) {
 
 async function createListing(seller) {
     const suffix = Date.now();
+    const now = Date.now();
+    const startTime = new Date(now - 1_000).toISOString();
+    const endTime = new Date(now + config.auctionLifetimeSeconds * 1_000).toISOString();
     const result = await api('/api/v1/catalogue/listings', {
         method: 'POST',
         actor: seller,
@@ -264,7 +280,10 @@ async function createListing(seller) {
             category: 'Electronics',
             startingPrice: 500,
             reservePrice: 500,
+            minimumIncrement: 5,
             currentPrice: 500,
+            startTime,
+            endTime,
             imageUrl: null,
         },
         label: 'create listing',
@@ -286,46 +305,35 @@ async function publishListing(seller, listingId) {
     });
 }
 
-async function createAuction(seller, listingId) {
+async function registerBiddingSession(seller, listingId) {
     const now = Date.now();
-    const startTime = new Date(now - 1_000).toISOString();
-    const endTime = new Date(now + config.auctionLifetimeSeconds * 1_000).toISOString();
+    const startTime = Math.floor((now - 1_000) / 1000);
+    const endTime = Math.floor((now + config.auctionLifetimeSeconds * 1_000) / 1000);
 
-    const result = await api('/api/v1/auctions', {
+    const result = await api('/api/v1/listings', {
         method: 'POST',
         actor: seller,
         body: {
             listingId,
             sellerId: seller.user.id,
             auctionType: 'ENGLISH',
-            startingPrice: 500,
-            reservePrice: 500,
-            minimumIncrement: 5,
+            starting_price_cents: 50_000,
+            reserve_price_cents: 50_000,
+            minimum_increment_cents: 500,
             startTime,
             endTime,
         },
-        expectedStatuses: [201],
-        label: 'create auction',
+        expectedStatuses: [201, 409],
+        label: 'register bidding session',
     });
 
-    const auctionId = String(result.payload?.id || '');
-    if (!auctionId) {
-        throw new SmokeError('Auction create did not return an id.', { payload: result.payload });
-    }
-    state.createdAuctionId = auctionId;
-    return { id: auctionId, endTime, payload: result.payload };
+    const sessionId = String(result.payload?.id || result.payload?.listingId || listingId);
+    state.createdAuctionId = sessionId;
+    return { id: sessionId, endTime, payload: result.payload };
 }
 
-async function markAuctionCreated(seller, listingId) {
-    return api(`/api/v1/catalogue/listings/${encodeURIComponent(listingId)}/auction-created`, {
-        method: 'POST',
-        actor: seller,
-        label: 'mark auction created',
-    });
-}
-
-async function placeBid(buyer, auctionId) {
-    const result = await api(`/api/v1/auctions/${encodeURIComponent(auctionId)}/bids`, {
+async function placeBid(buyer, listingId) {
+    const result = await api(`/api/v1/listings/${encodeURIComponent(listingId)}/bids`, {
         method: 'POST',
         actor: buyer,
         body: {
@@ -342,13 +350,13 @@ async function placeBid(buyer, auctionId) {
     return result.payload;
 }
 
-async function closeAuctionAfterEnd(seller, auctionId) {
+async function closeListingAfterEnd(seller, listingId) {
     return poll(async () => {
         try {
-            const result = await api(`/api/v1/auctions/${encodeURIComponent(auctionId)}/close`, {
+            const result = await api(`/api/v1/listings/${encodeURIComponent(listingId)}/close`, {
                 method: 'POST',
                 actor: seller,
-                label: 'close auction',
+                label: 'settle listing',
             });
             return result.payload;
         } catch (error) {
@@ -360,7 +368,21 @@ async function closeAuctionAfterEnd(seller, auctionId) {
             }
             throw error;
         }
-    }, 'auction close');
+    }, 'listing settlement');
+}
+
+async function waitForListingPrice(listingId, expectedPrice) {
+    return poll(async () => {
+        const result = await api(`/api/v1/catalogue/listings/${encodeURIComponent(listingId)}`, {
+            label: 'read listing after bid',
+        });
+        const currentPrice = Number(result.payload?.currentPrice);
+        const hasBids = Boolean(result.payload?.hasBids);
+        if (hasBids && Number.isFinite(currentPrice) && currentPrice >= expectedPrice) {
+            return result.payload;
+        }
+        return null;
+    }, 'catalogue bid price sync');
 }
 
 async function waitForAuctionNotification(buyer, auctionId) {

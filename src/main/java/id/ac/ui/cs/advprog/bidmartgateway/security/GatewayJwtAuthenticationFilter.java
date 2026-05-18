@@ -200,7 +200,10 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
                 : path;
         return normalized.equals("/api/v1/auctions")
                 || normalized.matches("^/api/v1/auctions/[^/]+$")
-                || normalized.matches("^/api/v1/auctions/[^/]+/bids$");
+                || normalized.matches("^/api/v1/auctions/[^/]+/bids$")
+                || normalized.equals("/api/v1/listings")
+                || normalized.matches("^/api/v1/listings/[^/]+$")
+                || normalized.matches("^/api/v1/listings/[^/]+/bids$");
     }
 
     private Mono<Void> reject(ServerWebExchange exchange, HttpStatus status) {
