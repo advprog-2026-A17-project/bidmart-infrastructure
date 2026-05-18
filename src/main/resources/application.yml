@@ -80,3 +80,16 @@ app:
     rate-limit:
       max-attempts: ${GATEWAY_RATE_LIMIT_MAX_ATTEMPTS:20}
       window-seconds: ${GATEWAY_RATE_LIMIT_WINDOW_SECONDS:60}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
