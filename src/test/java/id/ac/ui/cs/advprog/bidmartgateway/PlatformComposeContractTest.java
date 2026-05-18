@@ -26,7 +26,7 @@ class PlatformComposeContractTest {
         assertTrue(compose.contains("MIDTRANS_CLIENT_KEY"));
 
         assertTrue(gatewayConfig.contains("- id: notification-service-ws"));
-        assertTrue(gatewayConfig.contains("uri: ${ORDER_SERVICE_URL:http://localhost:8084}"));
+        assertTrue(gatewayConfig.contains("uri: ${ORDER_SERVICE_URL:http://order-notification-service:8084}"));
         assertTrue(gatewayConfig.contains("Path=/ws/notifications/**"));
     }
 
