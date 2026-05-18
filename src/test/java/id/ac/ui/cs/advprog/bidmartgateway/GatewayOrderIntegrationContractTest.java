@@ -12,7 +12,7 @@ class GatewayOrderIntegrationContractTest {
 
         assertTrue(yaml.contains("- id: order-service"));
         assertTrue(yaml.contains("uri: ${ORDER_SERVICE_URL:http://localhost:8084}"));
-        assertTrue(yaml.contains("Path=/api/v1/orders/**"));
+        assertTrue(yaml.contains("Path=/api/v1/orders,/api/v1/orders/**"));
     }
 
     @Test
