@@ -48,8 +48,8 @@ services:
     env_file: *gateway-env-files
     environment:
       PORT: 8000
-      GATEWAY_AUTH_WS_SERVICE_URL: ${GATEWAY_AUTH_WS_SERVICE_URL:-lb:ws://auth-service}
-      GATEWAY_ORDER_WS_SERVICE_URL: ${GATEWAY_ORDER_WS_SERVICE_URL:-lb:ws://order-notification-service}
+      GATEWAY_AUTH_WS_SERVICE_URL: ${GATEWAY_AUTH_WS_SERVICE_URL:-lb://auth-service}
+      GATEWAY_ORDER_WS_SERVICE_URL: ${GATEWAY_ORDER_WS_SERVICE_URL:-lb://order-notification-service}
       GATEWAY_AUTH_SERVICE_URL: ${GATEWAY_AUTH_SERVICE_URL:-lb://auth-service}
       GATEWAY_CATALOGUE_SERVICE_URL: ${GATEWAY_CATALOGUE_SERVICE_URL:-lb://catalogue-service}
       GATEWAY_AUCTION_SERVICE_URL: ${GATEWAY_AUCTION_SERVICE_URL:-lb://auction-service}
@@ -100,6 +100,7 @@ services:
       context: ../bidmart-catalogue-service
     expose:
       - "8081"
+      - "9091"
     env_file: *catalogue-env-files
     environment:
       SPRING_DATASOURCE_URL: ${CATALOGUE_DATABASE_URL:-jdbc:postgresql://catalogue-db:5432/bidmart_catalogue}
@@ -129,7 +130,9 @@ services:
       BIND_ADDRESS: 0.0.0.0:8082
       DATABASE_URL: ${AUCTION_DATABASE_URL:-postgresql://postgres:postgres@auction-db:5432/bidmart_auction}
       CATALOGUE_SERVICE_URL: ${CATALOGUE_SERVICE_URL:-http://catalogue-service:8081}
+      CATALOGUE_GRPC_URL: ${CATALOGUE_GRPC_URL:-http://catalogue-service:9091}
       WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
+      WALLET_GRPC_URL: ${WALLET_GRPC_URL:-http://wallet-service:50051}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/%2f}
       BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
       GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
@@ -152,6 +155,7 @@ services:
       context: ../bidmart-wallet-service-rust
     expose:
       - "8083"
+      - "50051"
     env_file: *wallet-env-files
     environment:
       DATABASE_URL: ${WALLET_DATABASE_URL:-postgresql://postgres:postgres@wallet-db:5432/bidmart_wallet_db}
@@ -174,6 +178,7 @@ services:
       MIDTRANS_IRIS_MERCHANT_KEY: ${MIDTRANS_IRIS_MERCHANT_KEY:-IRIS-merchant-key-local}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost}
       PORT: 8083
+      GRPC_PORT: 50051
       AUCTION_SERVICE_BASE_URL: ${WALLET_AUCTION_SERVICE_BASE_URL:-http://auction-service:8082/api/v1/auctions}
     volumes:
       - wallet-rust-data:/data

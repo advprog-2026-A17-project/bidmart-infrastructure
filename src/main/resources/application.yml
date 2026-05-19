@@ -22,7 +22,25 @@ spring:
     loadbalancer:
       retry:
         enabled: true
+      # Use Consistent Hash (Sticky Sessions) for WebSockets/SockJS
+      # This ensures fallbacks like Long Polling stay on the same instance.
+      clients:
+        order-notification-service:
+          load-balancer:
+            type: weighted
+        auth-service:
+          load-balancer:
+            type: weighted
+
     gateway:
+      # WebSocket Timeouts
+      # Prevents idle connections from hanging indefinitely and consuming resources.
+      httpclient:
+        websocket:
+          max-frame-payload-length: 65536
+          proxy-ping-interval: 30s
+        connect-timeout: 5000
+        response-timeout: 300s # Maximum duration for a single request/websocket stream
       # Centralized CORS Configuration
       globalcors:
         corsConfigurations:
@@ -45,14 +63,14 @@ spring:
       routes:
         # WebSocket Route
         - id: notification-service-ws
-          uri: ${GATEWAY_ORDER_WS_SERVICE_URL:lb:ws://order-notification-service}
+          uri: ${GATEWAY_ORDER_WS_SERVICE_URL:lb://order-notification-service}
           predicates:
             - Path=/ws/notifications/**
           filters:
             - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
 
         - id: auth-service-ws
-          uri: ${GATEWAY_AUTH_WS_SERVICE_URL:lb:ws://auth-service}
+          uri: ${GATEWAY_AUTH_WS_SERVICE_URL:lb://auth-service}
           predicates:
             - Path=/ws/**
           filters:
