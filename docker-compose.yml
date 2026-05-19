@@ -63,6 +63,18 @@ services:
       - order-notification-service
     restart: ${RESTART_POLICY:-unless-stopped}
 
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    ports:
+      - "${SWAGGER_UI_PORT:-8088}:8080"
+    environment:
+      SWAGGER_JSON: /usr/share/nginx/html/swagger/openapi-index.yaml
+    volumes:
+      - ..:/usr/share/nginx/html/swagger:ro
+    depends_on:
+      - gateway
+    restart: ${RESTART_POLICY:-unless-stopped}
+
   auth-service:
     image: ${AUTH_IMAGE:-bidmart-auth-service:local}
     build:
