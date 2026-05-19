@@ -40,7 +40,7 @@ class GatewayJwtAuthenticationFilterTest {
                 INTERNAL_TOKEN
         );
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.post("/api/v1/auctions")
+                MockServerHttpRequest.post("/api/v1/listings")
         );
 
         filter.filter(exchange, successChain()).block();
@@ -109,7 +109,7 @@ class GatewayJwtAuthenticationFilterTest {
         );
         String token = token("seller-1", "seller@test.com", List.of("SELLER"));
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.method(HttpMethod.POST, "/api/v1/auctions")
+                MockServerHttpRequest.method(HttpMethod.POST, "/api/v1/listings")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
         );
 
@@ -186,22 +186,22 @@ class GatewayJwtAuthenticationFilterTest {
         );
         AtomicReference<ServerWebExchange> listExchange = new AtomicReference<>();
         MockServerWebExchange listRequest = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/v1/auctions")
+                MockServerHttpRequest.get("/api/v1/listings")
                         .header("X-User-Id", "spoofed-user")
         );
         filter.filter(listRequest, captureChain(listExchange)).block();
 
-        assertEquals("/api/v1/auctions", listExchange.get().getRequest().getURI().getPath());
+        assertEquals("/api/v1/listings", listExchange.get().getRequest().getURI().getPath());
         assertNull(listExchange.get().getRequest().getHeaders().getFirst("X-User-Id"));
         assertNull(listRequest.getResponse().getStatusCode());
 
         AtomicReference<ServerWebExchange> detailExchange = new AtomicReference<>();
         MockServerWebExchange detailRequest = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/v1/auctions/auction-1")
+                MockServerHttpRequest.get("/api/v1/listings/auction-1")
         );
         filter.filter(detailRequest, captureChain(detailExchange)).block();
 
-        assertEquals("/api/v1/auctions/auction-1", detailExchange.get().getRequest().getURI().getPath());
+        assertEquals("/api/v1/listings/auction-1", detailExchange.get().getRequest().getURI().getPath());
         assertNull(detailRequest.getResponse().getStatusCode());
     }
 

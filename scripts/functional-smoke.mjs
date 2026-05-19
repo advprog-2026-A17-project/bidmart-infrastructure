@@ -72,13 +72,6 @@ async function main() {
         });
     });
 
-    await step('legacy auction route alias remains reachable', () => {
-        return api('/api/v1/auctions', {
-            expectedStatuses: [200, 401, 403],
-            label: 'unauthenticated legacy auction route',
-        });
-    });
-
     if (!config.skipFrontend) {
         await step('frontend shell is reachable', () => {
             return request(config.frontendUrl, { expectedStatuses: [200] });
@@ -115,9 +108,9 @@ async function main() {
     const listing = await step('seller can create a catalogue listing', () => createListing(seller));
     await step('seller can publish the listing', () => publishListing(seller, listing.id));
 
-    const session = await step('seller can register the bidding session for the listing', () => registerBiddingSession(seller, listing.id));
+    const session = await step('seller can open listing auction session', () => openListingAuctionSession(seller, listing.id));
     if (session.id !== listing.id) {
-        throw new SmokeError('Bidding session id must match catalogue listing id.', {
+        throw new SmokeError('Listing auction session id must match catalogue listing id.', {
             listingId: listing.id,
             sessionId: session.id,
         });
@@ -145,7 +138,7 @@ async function main() {
     console.log('');
     console.log('Functional smoke passed.');
     console.log(`Created listing: ${state.createdListingId}`);
-    console.log(`Bidding session: ${state.createdAuctionId ?? state.createdListingId}`);
+    console.log(`Listing auction session: ${state.createdAuctionId ?? state.createdListingId}`);
 }
 
 async function authenticateActor(role) {
@@ -305,7 +298,7 @@ async function publishListing(seller, listingId) {
     });
 }
 
-async function registerBiddingSession(seller, listingId) {
+async function openListingAuctionSession(seller, listingId) {
     const now = Date.now();
     const startTime = Math.floor((now - 1_000) / 1000);
     const endTime = Math.floor((now + config.auctionLifetimeSeconds * 1_000) / 1000);
@@ -324,7 +317,7 @@ async function registerBiddingSession(seller, listingId) {
             endTime,
         },
         expectedStatuses: [201, 409],
-        label: 'register bidding session',
+        label: 'open listing auction session',
     });
 
     const sessionId = String(result.payload?.id || result.payload?.listingId || listingId);

@@ -172,7 +172,7 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
     /**
      * Routes that do not require authentication but should forward identity
      * headers when a valid token is present. This allows public browsing
-     * of catalogue and auction listings while still providing user context.
+     * of catalogue and listing bid sessions while still providing user context.
      */
     private boolean isOptionallyAuthenticatedRoute(HttpMethod method, String path) {
         return isPublicCatalogueRead(method, path) || isPublicAuctionRead(method, path);
@@ -198,10 +198,7 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
         String normalized = path.endsWith("/") && path.length() > 1
                 ? path.substring(0, path.length() - 1)
                 : path;
-        return normalized.equals("/api/v1/auctions")
-                || normalized.matches("^/api/v1/auctions/[^/]+$")
-                || normalized.matches("^/api/v1/auctions/[^/]+/bids$")
-                || normalized.equals("/api/v1/listings")
+        return normalized.equals("/api/v1/listings")
                 || normalized.matches("^/api/v1/listings/[^/]+$")
                 || normalized.matches("^/api/v1/listings/[^/]+/bids$");
     }

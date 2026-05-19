@@ -7,12 +7,12 @@ Use the functional smoke suite after the Docker stack is running to avoid repeat
 The full scope exercises the system through the gateway:
 
 - public catalogue search
-- bidding route reachability (`/api/v1/listings`) and legacy alias (`/api/v1/auctions`)
+- bidding route reachability (`/api/v1/listings`)
 - frontend shell reachability
 - seller and buyer login
 - buyer wallet creation/read and sandbox top-up
 - seller listing create (with auction timing fields) and publish
-- bidding session registration (`POST /api/v1/listings`, id = `listingId`)
+- listing auction session open (`POST /api/v1/listings`, id = `listingId`)
 - buyer bid placement with wallet hold (`POST /api/v1/listings/{id}/bids`)
 - catalogue price sync after bid (async MQ → catalogue `currentPrice`)
 - listing settlement after end time (`POST /api/v1/listings/{id}/close`)
@@ -24,7 +24,7 @@ The suite is API-level, not browser UI automation.
 
 ```text
 Catalogue:  POST /catalogue/listings → POST .../publish (ACTIVE)
-Bidding:    POST /listings { listingId }  (session id = listing id)
+Bidding:    POST /listings { listingId }  (listing auction session id = listing id)
 Buyer:      POST /listings/{id}/bids
 Catalogue:  GET /catalogue/listings/{id}  (currentPrice, hasBids)
 Seller:     POST /listings/{id}/close      (settlement)

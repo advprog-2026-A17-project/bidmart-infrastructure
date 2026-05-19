@@ -32,12 +32,12 @@ class GatewayRateLimitFilterTest {
         GatewayRateLimitFilter filter = new GatewayRateLimitFilter(1, 60);
         GatewayFilterChain chain = exchange -> Mono.empty();
 
-        filter.filter(exchange(HttpMethod.POST, "/api/v1/auctions"), chain).block();
-        MockServerWebExchange auctionLimited = exchange(HttpMethod.POST, "/api/v1/auctions");
+        filter.filter(exchange(HttpMethod.POST, "/api/v1/listings"), chain).block();
+        MockServerWebExchange auctionLimited = exchange(HttpMethod.POST, "/api/v1/listings");
         filter.filter(auctionLimited, chain).block();
 
-        filter.filter(exchange(HttpMethod.POST, "/api/v1/auctions/auction-1/bids"), chain).block();
-        MockServerWebExchange bidLimited = exchange(HttpMethod.POST, "/api/v1/auctions/auction-1/bids");
+        filter.filter(exchange(HttpMethod.POST, "/api/v1/listings/auction-1/bids"), chain).block();
+        MockServerWebExchange bidLimited = exchange(HttpMethod.POST, "/api/v1/listings/auction-1/bids");
         filter.filter(bidLimited, chain).block();
 
         filter.filter(exchange(HttpMethod.POST, "/api/v1/wallet/hold"), chain).block();

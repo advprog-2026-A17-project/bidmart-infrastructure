@@ -18,13 +18,13 @@ public class RoutePermissionPolicy {
             return "admin:users";
         }
 
-        if (HttpMethod.POST.equals(method) && (matchesExact(path, "/api/v1/auctions") || matchesExact(path, "/api/v1/listings"))) {
+        if (HttpMethod.POST.equals(method) && matchesExact(path, "/api/v1/listings")) {
             return "auction:create";
         }
-        if (HttpMethod.POST.equals(method) && (matchesChildAction(path, "/api/v1/auctions", "bids") || matchesChildAction(path, "/api/v1/listings", "bids"))) {
+        if (HttpMethod.POST.equals(method) && matchesChildAction(path, "/api/v1/listings", "bids")) {
             return "bid:place";
         }
-        if (HttpMethod.POST.equals(method) && (matchesChildAction(path, "/api/v1/auctions", "close") || matchesChildAction(path, "/api/v1/listings", "close"))) {
+        if (HttpMethod.POST.equals(method) && matchesChildAction(path, "/api/v1/listings", "close")) {
             return "auction:close";
         }
         // Catalogue listing mutations
@@ -77,4 +77,3 @@ public class RoutePermissionPolicy {
         return false;
     }
 }
-

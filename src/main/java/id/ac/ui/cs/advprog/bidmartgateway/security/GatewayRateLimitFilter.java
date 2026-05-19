@@ -77,11 +77,11 @@ public class GatewayRateLimitFilter implements GlobalFilter, Ordered {
         if (HttpMethod.POST.equals(method) && path.equals("/api/v1/auth/login")) {
             return "login";
         }
-        if (HttpMethod.POST.equals(method) && (path.equals("/api/v1/auctions") || path.equals("/api/v1/listings"))) {
+        if (HttpMethod.POST.equals(method) && path.equals("/api/v1/listings")) {
             return "auction-create";
         }
         if (HttpMethod.POST.equals(method)
-                && (path.startsWith("/api/v1/auctions/") || path.startsWith("/api/v1/listings/"))
+                && path.startsWith("/api/v1/listings/")
                 && path.endsWith("/bids")) {
             return "bid-place";
         }
