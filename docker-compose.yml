@@ -70,7 +70,12 @@ services:
     environment:
       SWAGGER_JSON: /usr/share/nginx/html/swagger/openapi-index.yaml
     volumes:
-      - ..:/usr/share/nginx/html/swagger:ro
+      - ../openapi-index.yaml:/usr/share/nginx/html/swagger/openapi-index.yaml:ro
+      - ../bidmart-auth-service/docs:/usr/share/nginx/html/swagger/bidmart-auth-service/docs:ro
+      - ../bidmart-catalogue-service/docs:/usr/share/nginx/html/swagger/bidmart-catalogue-service/docs:ro
+      - ../bidmart-auction-service-rust/docs:/usr/share/nginx/html/swagger/bidmart-auction-service-rust/docs:ro
+      - ../bidmart-wallet-service-rust/docs:/usr/share/nginx/html/swagger/bidmart-wallet-service-rust/docs:ro
+      - ../bidmart-order-and-notification-service/docs:/usr/share/nginx/html/swagger/bidmart-order-and-notification-service/docs:ro
     depends_on:
       - gateway
     restart: ${RESTART_POLICY:-unless-stopped}
