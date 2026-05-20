@@ -228,6 +228,8 @@ services:
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
       BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
       APP_INTERNAL_SERVICE_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
+      GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
+      WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
       BIDMART_AUTH_BASE_URL: ${BIDMART_AUTH_BASE_URL:-http://auth-service:8080}
       BIDMART_AUTH_INTERNAL_SERVICE_TOKEN: ${AUTH_INTERNAL_SERVICE_TOKEN:-bidmart-local-internal-token}
     depends_on:

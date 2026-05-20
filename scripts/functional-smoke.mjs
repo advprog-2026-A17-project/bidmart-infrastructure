@@ -118,13 +118,26 @@ async function main() {
 
     await step('buyer can place a bid backed by wallet hold', () => placeBid(buyer, listing.id));
     await step('catalogue reflects bid price update', () => waitForListingPrice(listing.id, 505));
-    await step('listing can settle after its end time', () => closeListingAfterEnd(seller, listing.id));
+    const settled = await step('listing can settle after its end time', () => closeListingAfterEnd(seller, listing.id));
+    const auctionStatus = String(settled?.status || '').toUpperCase();
+    if (auctionStatus !== 'WON') {
+        throw new SmokeError('Expected auction to close as WON for win-path smoke.', {
+            listingId: listing.id,
+            status: auctionStatus,
+            settled,
+        });
+    }
 
     await step('buyer wallet detail remains readable after auction lifecycle', () => ensureWallet(buyer));
 
     if (!config.skipNotifications) {
         await step('buyer receives an auction notification', () => waitForAuctionNotification(buyer, listing.id));
     }
+
+    const winOrder = await step('buyer order exists after auction win', () =>
+        waitForBuyerOrder(buyer, listing.id)
+    );
+    await step('buyer order status is CREATED after win', () => verifyWinOrderCreated(winOrder));
 
     // If admin credentials were provided, validate an admin-only endpoint
     if (admin) {
@@ -376,6 +389,32 @@ async function waitForListingPrice(listingId, expectedPrice) {
         }
         return null;
     }, 'catalogue bid price sync');
+}
+
+async function waitForBuyerOrder(buyer, listingId) {
+    return poll(async () => {
+        const result = await api('/api/v1/orders', {
+            actor: buyer,
+            label: 'list buyer orders',
+        });
+        const orders = Array.isArray(result.payload) ? result.payload : [];
+        const match = orders.find((order) => {
+            const auctionId = String(order.auctionId || order.listingId || '');
+            return auctionId === listingId;
+        });
+        return match || null;
+    }, 'buyer order after win');
+}
+
+function verifyWinOrderCreated(order) {
+    const status = String(order?.status || '').toUpperCase();
+    if (!status) {
+        throw new SmokeError('Win-path order missing status field.', { order });
+    }
+    if (status !== 'CREATED') {
+        throw new SmokeError(`Expected win-path order status CREATED but got ${status}.`, { order });
+    }
+    return order;
 }
 
 async function waitForAuctionNotification(buyer, auctionId) {

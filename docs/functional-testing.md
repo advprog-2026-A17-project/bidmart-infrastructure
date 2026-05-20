@@ -18,6 +18,30 @@ The full scope exercises the system through the gateway:
 - listing settlement after end time (`POST /api/v1/listings/{id}/close`)
 - buyer notification delivery (optional)
 
+### Win-path verification (order + wallet + payout)
+
+After auction close with a winning bidder, validate the financial path manually or extend smoke with:
+
+1. **Order auto-create** — `GET /api/v1/orders` as buyer shows order for `listingId` / `auctionId` with status `CREATED`.
+2. **Seller shipping** — `PUT /api/v1/orders/{id}/status` → `PACKED` then `SHIPPED` (seller token).
+3. **Buyer confirm** — `POST /api/v1/orders/{id}/confirm` → status `CONFIRMED`.
+4. **Wallet** — buyer: winning hold converted (`CONVERT` in history); seller: escrow/held proceeds visible before payout.
+5. **Payout** — after `bidmart.order.payout-delay-minutes` (default 5), seller active balance increases; order `payoutReleasedAt` set.
+
+Quick checks:
+
+```bash
+# Buyer orders after close
+curl -s -H "Authorization: Bearer $BIDMART_BUYER_TOKEN" \
+  "$BIDMART_GATEWAY_URL/api/v1/orders" | jq .
+
+# Seller wallet detail (held → active after payout scheduler)
+curl -s -H "Authorization: Bearer $BIDMART_SELLER_TOKEN" \
+  "$BIDMART_GATEWAY_URL/api/v1/wallet/$BIDMART_SELLER_USER_ID/detail" | jq .
+```
+
+Playwright win path: `bidmart-frontend/e2e/auction-win.spec.ts` (bid → close → order → ship → confirm), plus `wallet.spec.ts` and `auction-war.spec.ts` (run headed locally; CI nightly job uploads HTML report).
+
 The suite is API-level, not browser UI automation.
 
 ## Listing-as-auction flow under test
