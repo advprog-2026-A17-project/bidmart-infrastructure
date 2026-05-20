@@ -102,6 +102,9 @@ services:
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
       AUTH_WALLET_PROVISIONING_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
+      AUTH_INTERNAL_SERVICE_TOKEN: ${AUTH_INTERNAL_SERVICE_TOKEN:-bidmart-local-internal-token}
+      AUTH_PASSWORD_RESET_BASE_URL: ${AUTH_PASSWORD_RESET_BASE_URL:-http://localhost:3000/reset-password}
+      AUTH_AUDIT_EXCHANGE: ${AUTH_AUDIT_EXCHANGE:-bidmart.auth.events}
     depends_on:
       auth-db:
         condition: service_healthy
@@ -225,6 +228,8 @@ services:
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
       BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
       APP_INTERNAL_SERVICE_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
+      BIDMART_AUTH_BASE_URL: ${BIDMART_AUTH_BASE_URL:-http://auth-service:8080}
+      BIDMART_AUTH_INTERNAL_SERVICE_TOKEN: ${AUTH_INTERNAL_SERVICE_TOKEN:-bidmart-local-internal-token}
     depends_on:
       order-db:
         condition: service_healthy
