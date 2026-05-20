@@ -103,7 +103,7 @@ services:
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
       AUTH_WALLET_PROVISIONING_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
       AUTH_INTERNAL_SERVICE_TOKEN: ${AUTH_INTERNAL_SERVICE_TOKEN:-bidmart-local-internal-token}
-      AUTH_PASSWORD_RESET_BASE_URL: ${AUTH_PASSWORD_RESET_BASE_URL:-http://localhost:3000/reset-password}
+      AUTH_PASSWORD_RESET_BASE_URL: ${AUTH_PASSWORD_RESET_BASE_URL:-http://localhost:5173/reset-password}
       AUTH_AUDIT_EXCHANGE: ${AUTH_AUDIT_EXCHANGE:-bidmart.auth.events}
     depends_on:
       auth-db:
