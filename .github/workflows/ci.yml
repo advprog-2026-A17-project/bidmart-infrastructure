@@ -1,10 +1,8 @@
 name: Continuous Integration
 
 on:
-  pull_request:
-    branches: ["staging", "main", "feat/checkpoint-100"]
   push:
-    branches: ["staging", "main", "feat/checkpoint-100"]
+  pull_request:
 
 jobs:
   test:
