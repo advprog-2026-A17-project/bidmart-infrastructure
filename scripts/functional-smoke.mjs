@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const DEFAULT_GATEWAY_URL = 'http://localhost:8000';
-const DEFAULT_FRONTEND_URL = 'http://localhost';
+const DEFAULT_FRONTEND_URL = 'http://localhost:5173';
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_POLL_TIMEOUT_MS = 200_000;
 const DEFAULT_POLL_INTERVAL_MS = 1_000;

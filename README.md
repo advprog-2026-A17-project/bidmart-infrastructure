@@ -4,10 +4,14 @@ API Gateway (Spring Cloud Gateway), orkestrasi **Docker Compose**, konfigurasi e
 
 ## Menjalankan
 
+### Backend (Docker)
+
 ```bash
 cp .env.example .env
 docker compose up -d --build
 ```
+
+If a build fails with `TLS handshake timeout` while pulling from Docker Hub, retry with `./scripts/docker-up.sh` (pre-pulls base images with backoff).
 
 | Layanan | URL / port |
 |---------|------------|
@@ -16,6 +20,23 @@ docker compose up -d --build
 | Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3001 |
 | RabbitMQ UI | http://localhost:15672 |
+
+### Frontend (di host — pola dev yang disarankan)
+
+Frontend **tidak** dijalankan lewat Compose. Jalankan Vite di laptop:
+
+```bash
+cd ../bidmart-frontend
+cp .env.example .env
+npm ci
+npm run dev
+```
+
+| UI | URL |
+|----|-----|
+| Frontend (Vite) | http://localhost:5173 |
+
+Set `FRONTEND_BASE_URL=http://localhost:5173` di `.env` infrastructure agar link email/reset password mengarah ke Vite.
 
 ## Dokumentasi
 

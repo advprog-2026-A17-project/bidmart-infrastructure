@@ -92,8 +92,14 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
             return chain.filter(withVerifiedIdentity(exchange, claims));
         }
 
-        return authPermissionClient.hasPermission(email, requiredPermission)
-                .flatMap(allowed -> {
+        Mono<Boolean> permissionCheck = authPermissionClient.hasPermission(email, requiredPermission);
+        if (requiredPermission.startsWith("admin:")) {
+            permissionCheck = permissionCheck.flatMap(allowed -> allowed
+                    ? Mono.just(true)
+                    : authPermissionClient.hasPermission(email, "admin:*"));
+        }
+
+        return permissionCheck.flatMap(allowed -> {
                     if (!allowed) {
                         gatewayMetrics.recordForbidden();
                         return reject(exchange, HttpStatus.FORBIDDEN);
@@ -194,6 +200,7 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
                 : path;
         return normalized.equals("/api/v1/catalogue/listings")
                 || normalized.equals("/api/v1/catalogue/listings/search")
+                || normalized.equals("/api/v1/catalogue/categories/tree")
                 || normalized.matches("^/api/v1/catalogue/listings/[^/]+$")
                 || normalized.matches("^/api/v1/catalogue/listings/[^/]+/summary$");
     }
