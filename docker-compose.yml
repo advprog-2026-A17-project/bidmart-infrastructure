@@ -32,11 +32,6 @@ x-env-files:
       required: false
     - path: .env
       required: false
-  frontend: &frontend-env-files
-    - path: ../bidmart-frontend/.env
-      required: false
-    - path: .env
-      required: false
 
 services:
   gateway:
@@ -93,6 +88,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${AUTH_DB_PASSWORD:-postgres}
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${AUTH_DDL_AUTO:-update}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-bidmart-auth-secret-key-bidmart-auth-secret-key}
+      AUTH_MAX_CONCURRENT_SESSIONS: ${AUTH_MAX_CONCURRENT_SESSIONS:-5}
+      AUTH_SESSION_LIMIT_POLICY: ${AUTH_SESSION_LIMIT_POLICY:-REVOKE_OLDEST}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
@@ -196,7 +193,7 @@ services:
       MIDTRANS_IRIS_BASE_URL: ${MIDTRANS_IRIS_BASE_URL:-https://app.sandbox.midtrans.com/iris/api/v1}
       MIDTRANS_IRIS_API_KEY: ${MIDTRANS_IRIS_API_KEY:-IRIS-api-key-local}
       MIDTRANS_IRIS_MERCHANT_KEY: ${MIDTRANS_IRIS_MERCHANT_KEY:-IRIS-merchant-key-local}
-      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
       PORT: 8083
       GRPC_PORT: 50051
       AUCTION_SERVICE_BASE_URL: ${WALLET_AUCTION_SERVICE_BASE_URL:-http://auction-service:8082/api/v1/listings}
@@ -240,25 +237,6 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    restart: ${RESTART_POLICY:-unless-stopped}
-
-  frontend:
-    image: node:20-alpine
-    working_dir: /app
-    command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173"
-    env_file: *frontend-env-files
-    environment:
-      VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-}
-      VITE_GOOGLE_CLIENT_ID: ${OAUTH_GOOGLE_CLIENT_ID:-}
-      CHOKIDAR_USEPOLLING: ${FRONTEND_CHOKIDAR_USEPOLLING:-true}
-      WATCHPACK_POLLING: ${FRONTEND_WATCHPACK_POLLING:-true}
-    ports:
-      - "${FRONTEND_PORT:-5173}:5173"
-    volumes:
-      - ../bidmart-frontend:/app
-      - frontend-node-modules:/app/node_modules
-    depends_on:
-      - gateway
     restart: ${RESTART_POLICY:-unless-stopped}
 
   prometheus:
@@ -431,6 +409,5 @@ volumes:
   wallet-rust-data:
   redis-data:
   rabbitmq-data:
-  frontend-node-modules:
   prometheus-data:
   grafana-data:

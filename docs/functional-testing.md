@@ -103,7 +103,7 @@ export BIDMART_BUYER_USER_ID='...'
 
 ```bash
 export BIDMART_GATEWAY_URL=http://localhost:8000
-export BIDMART_FRONTEND_URL=http://localhost
+export BIDMART_FRONTEND_URL=http://localhost:5173
 export BIDMART_SMOKE_SCOPE=full
 export BIDMART_AUCTION_LIFETIME_SECONDS=5
 export BIDMART_SMOKE_TOP_UP_CENTS=100000
@@ -111,7 +111,7 @@ export BIDMART_SKIP_FRONTEND_CHECK=1
 export BIDMART_SKIP_NOTIFICATION_CHECK=1
 ```
 
-If the browser uses the frontend proxy at `http://localhost`, set `BIDMART_GATEWAY_URL=http://localhost`.
+Run the frontend with `npm run dev` in `bidmart-frontend` (http://localhost:5173). Smoke checks that URL by default.
 
 ## Expected stack state
 
@@ -119,6 +119,6 @@ If the browser uses the frontend proxy at `http://localhost`, set `BIDMART_GATEW
 docker compose up -d --build
 ```
 
-Requires RabbitMQ, PostgreSQL, gateway, wallet, catalogue, auction (Rust), order/notification, auth, and frontend services healthy enough to receive traffic.
+Requires RabbitMQ, PostgreSQL, gateway, wallet, catalogue, auction (Rust), order/notification, and auth healthy. For full scope, also run `npm run dev` in `bidmart-frontend` (Vite on port 5173).
 
 Run catalogue migration **V10** (`minimum_increment`, `start_time`) before full-scope smoke if the catalogue DB was created before the listing-as-auction refactor.
