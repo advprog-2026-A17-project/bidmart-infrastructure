@@ -37,6 +37,9 @@ public class RoutePermissionPolicy {
         if (isCatalogueMutationRoute(method, path)) {
             return "listing:manage";
         }
+        if (HttpMethod.POST.equals(method) && matchesChildAction(path, "/api/v1/orders", "dispute/resolve")) {
+            return "admin:users";
+        }
         if (path.startsWith("/api/v1/wallet/") || matchesExact(path, "/api/v1/wallet")) {
             return HttpMethod.GET.equals(method) ? "wallet:view" : "wallet:mutate";
         }
