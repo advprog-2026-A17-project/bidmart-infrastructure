@@ -1,0 +1,56 @@
+# Prometheus scrape config for production (Heroku public URLs).
+# Use with Grafana Cloud Prometheus scrape jobs, Grafana Alloy, or a self-hosted Prometheus VM.
+#
+# Replace each host below with your live Heroku app hostname (no path, no scheme).
+# Example: bidmart-authentication-service-5f40f293e67d.herokuapp.com:443
+#
+# Known live examples (update when new apps deploy):
+#   Auth:    bidmart-authentication-service-5f40f293e67d.herokuapp.com
+#   Auction: bidmart-auction-service-c30c7668b800.herokuapp.com
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: bidmart-gateway
+    scheme: https
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - REPLACE_WITH_GATEWAY_APP.herokuapp.com:443
+
+  - job_name: bidmart-auth-service
+    scheme: https
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - bidmart-authentication-service-5f40f293e67d.herokuapp.com:443
+
+  - job_name: bidmart-catalogue-service
+    scheme: https
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - REPLACE_WITH_CATALOGUE_APP.herokuapp.com:443
+
+  - job_name: bidmart-auction-service
+    scheme: https
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - bidmart-auction-service-c30c7668b800.herokuapp.com:443
+
+  - job_name: bidmart-wallet-service
+    scheme: https
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - REPLACE_WITH_WALLET_APP.herokuapp.com:443
+
+  - job_name: bidmart-order-service
+    scheme: https
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - REPLACE_WITH_ORDER_APP.herokuapp.com:443
