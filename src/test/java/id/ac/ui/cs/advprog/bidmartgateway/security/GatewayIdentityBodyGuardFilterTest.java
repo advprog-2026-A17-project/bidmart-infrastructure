@@ -81,6 +81,20 @@ class GatewayIdentityBodyGuardFilterTest {
         assertNull(exchange.getResponse().getStatusCode());
     }
 
+    @Test
+    void trustedMutationWithEmptyBodyPassesThrough() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/catalogue/listings/listing-123/publish")
+                        .header("X-User-Id", "trusted-seller")
+        );
+        AtomicBoolean chained = new AtomicBoolean(false);
+
+        filter.filter(exchange, chain(chained)).block();
+
+        assertTrue(chained.get());
+        assertNull(exchange.getResponse().getStatusCode());
+    }
+
     private Flux<org.springframework.core.io.buffer.DataBuffer> json(String body) {
         return Flux.just(bufferFactory.wrap(body.getBytes(StandardCharsets.UTF_8)));
     }
