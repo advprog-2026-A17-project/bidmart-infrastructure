@@ -31,6 +31,9 @@ public class RoutePermissionPolicy {
         if (HttpMethod.POST.equals(method) && matchesExact(path, "/api/v1/catalogue/listings")) {
             return "listing:create";
         }
+        if (HttpMethod.POST.equals(method) && matchesChildAction(path, "/api/v1/catalogue/listings", "admin/close")) {
+            return "admin:users";
+        }
         if (isCatalogueMutationRoute(method, path)) {
             return "listing:manage";
         }
