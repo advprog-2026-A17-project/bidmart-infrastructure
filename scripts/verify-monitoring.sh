@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
 # Verify BidMart monitoring stack: actuator health endpoints and Prometheus scrape targets.
+# Production: USE_HEROKU_URLS=true with HEROKU_*_METRICS_URL in .env (see .env.example).
 set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+if [[ -f "${ROOT_DIR}/.env" ]]; then
+  # shellcheck disable=SC1091
+  set -a
+  source "${ROOT_DIR}/.env"
+  set +a
+fi
 
 GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:8000}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://127.0.0.1:9090}"
 GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3001}"
 GRAFANA_AUTH="${GRAFANA_AUTH:-}"
+USE_HEROKU_URLS="${USE_HEROKU_URLS:-false}"
 
-COMPOSE_FILE="${COMPOSE_FILE:-$(cd "$(dirname "$0")/.." && pwd)/docker-compose.yml}"
+COMPOSE_FILE="${COMPOSE_FILE:-${ROOT_DIR}/docker-compose.yml}"
 USE_DOCKER="${USE_DOCKER:-auto}"
 
 failures=0
@@ -23,6 +33,46 @@ curl_health() {
   else
     log_fail "$name ($url)"
   fi
+}
+
+curl_metrics() {
+  local name="$1"
+  local base_url="$2"
+  local path="$3"
+  if [[ -z "$base_url" || "$base_url" == *REPLACE_WITH* ]]; then
+    log_fail "$name (unset or placeholder URL)"
+    return
+  fi
+  base_url="${base_url%/}"
+  local url="${base_url}${path}"
+  local body
+  if body="$(curl -sf --max-time 15 "$url" 2>/dev/null)" && [[ -n "$body" ]]; then
+    if echo "$body" | grep -qE '^# HELP|^# TYPE|^[a-zA-Z_:][a-zA-Z0-9_:]* '; then
+      log_ok "$name ($url)"
+    else
+      log_fail "$name ($url — not Prometheus text format)"
+    fi
+  else
+    log_fail "$name ($url)"
+  fi
+}
+
+verify_heroku_metrics() {
+  echo
+  echo "-- Heroku metrics endpoints (production) --"
+  curl_metrics "Gateway prometheus" "${HEROKU_GATEWAY_METRICS_URL:-}" "/actuator/prometheus"
+  curl_metrics "Auth prometheus" "${HEROKU_AUTH_METRICS_URL:-}" "/actuator/prometheus"
+  curl_metrics "Catalogue prometheus" "${HEROKU_CATALOGUE_METRICS_URL:-}" "/actuator/prometheus"
+  curl_metrics "Auction metrics" "${HEROKU_AUCTION_METRICS_URL:-}" "/metrics"
+  curl_metrics "Wallet metrics" "${HEROKU_WALLET_METRICS_URL:-}" "/metrics"
+  curl_metrics "Order prometheus" "${HEROKU_ORDER_METRICS_URL:-}" "/actuator/prometheus"
+  echo
+  if [[ "$failures" -eq 0 ]]; then
+    echo "All Heroku metrics checks passed. Configure Grafana Cloud scrape next."
+    exit 0
+  fi
+  echo "${failures} check(s) failed. Wake Eco dynos or fix URLs in .env / HEROKU_*_METRICS_URL."
+  exit 1
 }
 
 docker_health() {
@@ -44,6 +94,10 @@ host_reachable() {
 }
 
 echo "== BidMart monitoring verification =="
+
+if [[ "$USE_HEROKU_URLS" == "true" ]]; then
+  verify_heroku_metrics
+fi
 
 if [[ "$USE_DOCKER" == "auto" ]]; then
   if host_reachable; then

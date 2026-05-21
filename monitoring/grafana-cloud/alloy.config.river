@@ -1,0 +1,75 @@
+// Optional Grafana Alloy config: scrape Heroku BidMart metrics and remote_write to Grafana Cloud.
+// 1. Replace REPLACE_WITH_* hostnames with live Heroku app hosts (no https:// prefix).
+// 2. Export credentials from Grafana Cloud → Prometheus → Details.
+// 3. Run: alloy run monitoring/grafana-cloud/alloy.config.river
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("GRAFANA_CLOUD_PROMETHEUS_URL")
+
+    basic_auth {
+      username = env("GRAFANA_CLOUD_PROMETHEUS_USER")
+      password = env("GRAFANA_CLOUD_API_KEY")
+    }
+  }
+}
+
+prometheus.scrape "gateway" {
+  targets = [{
+    __address__ = "REPLACE_WITH_GATEWAY_APP.herokuapp.com:443",
+    job         = "bidmart-gateway",
+  }]
+  scheme        = "https"
+  metrics_path  = "/actuator/prometheus"
+  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "auth" {
+  targets = [{
+    __address__ = "bidmart-authentication-service-5f40f293e67d.herokuapp.com:443",
+    job         = "bidmart-auth-service",
+  }]
+  scheme        = "https"
+  metrics_path  = "/actuator/prometheus"
+  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "catalogue" {
+  targets = [{
+    __address__ = "REPLACE_WITH_CATALOGUE_APP.herokuapp.com:443",
+    job         = "bidmart-catalogue-service",
+  }]
+  scheme        = "https"
+  metrics_path  = "/actuator/prometheus"
+  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "auction" {
+  targets = [{
+    __address__ = "bidmart-auction-service-c30c7668b800.herokuapp.com:443",
+    job         = "bidmart-auction-service",
+  }]
+  scheme        = "https"
+  metrics_path  = "/metrics"
+  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "wallet" {
+  targets = [{
+    __address__ = "REPLACE_WITH_WALLET_APP.herokuapp.com:443",
+    job         = "bidmart-wallet-service",
+  }]
+  scheme        = "https"
+  metrics_path  = "/metrics"
+  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "order" {
+  targets = [{
+    __address__ = "REPLACE_WITH_ORDER_APP.herokuapp.com:443",
+    job         = "bidmart-order-service",
+  }]
+  scheme        = "https"
+  metrics_path  = "/actuator/prometheus"
+  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+}
