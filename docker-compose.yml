@@ -232,6 +232,7 @@ services:
       WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
       BIDMART_AUTH_BASE_URL: ${BIDMART_AUTH_BASE_URL:-http://auth-service:8080}
       BIDMART_AUTH_INTERNAL_SERVICE_TOKEN: ${AUTH_INTERNAL_SERVICE_TOKEN:-bidmart-local-internal-token}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-bidmart-auth-secret-key-bidmart-auth-secret-key}
     depends_on:
       order-db:
         condition: service_healthy
