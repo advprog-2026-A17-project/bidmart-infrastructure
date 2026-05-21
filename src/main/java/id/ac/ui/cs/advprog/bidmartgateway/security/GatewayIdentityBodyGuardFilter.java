@@ -51,7 +51,8 @@ public class GatewayIdentityBodyGuardFilter implements GlobalFilter, Ordered {
                     return IdentityBodyConflictChecker.findConflict(trustedUserId, bodyBytes)
                             .map(conflictingField -> reject(exchange, conflictingField))
                             .orElseGet(() -> chain.filter(rebuildExchange(exchange, bodyBytes)));
-                });
+                })
+                .switchIfEmpty(chain.filter(exchange));
     }
 
     @Override
