@@ -1,0 +1,20 @@
+== BidMart monitoring verification ==
+
+-- Health endpoints --
+  OK   Gateway actuator health (http://127.0.0.1:8000/actuator/health)
+  OK   Prometheus self-health (http://127.0.0.1:9090/-/healthy)
+
+-- Prometheus targets --
+  OK   Prometheus targets API
+  OK   target bidmart-auction-service
+  OK   target bidmart-auth-service
+  FAIL target bidmart-catalogue-service (health=down)
+  OK   target bidmart-gateway
+  OK   target bidmart-order-service
+  OK   target bidmart-wallet-service
+
+-- Grafana (optional) --
+  FAIL Grafana API health (http://127.0.0.1:3001)
+
+2 check(s) failed. Ensure docker compose is up: cd bidmart-infrastructure && docker compose up -d
+Tip: run with USE_DOCKER=true to probe services inside the compose network.

@@ -227,6 +227,8 @@ services:
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
       BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
+      AUTH_AUDIT_EXCHANGE: ${AUTH_AUDIT_EXCHANGE:-bidmart.auth.events}
+      ORDER_AUTH_EVENTS_QUEUE: ${ORDER_AUTH_EVENTS_QUEUE:-order-notification.auth-events}
       APP_INTERNAL_SERVICE_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
       GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
       WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
