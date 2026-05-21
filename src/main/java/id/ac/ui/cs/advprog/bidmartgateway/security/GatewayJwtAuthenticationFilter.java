@@ -5,6 +5,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import id.ac.ui.cs.advprog.bidmartgateway.metrics.GatewayMetrics;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -34,17 +35,20 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private final AuthPermissionClient authPermissionClient;
     private final RoutePermissionPolicy routePermissionPolicy;
+    private final GatewayMetrics gatewayMetrics;
     private final SecretKey signingKey;
     private final String internalServiceToken;
 
     public GatewayJwtAuthenticationFilter(
             AuthPermissionClient authPermissionClient,
             RoutePermissionPolicy routePermissionPolicy,
+            GatewayMetrics gatewayMetrics,
             @Value("${app.auth.jwt.secret:bidmart-auth-secret-key-bidmart-auth-secret-key}") String jwtSecret,
             @Value("${app.gateway.internal-token:bidmart-local-internal-token}") String internalServiceToken
     ) {
         this.authPermissionClient = authPermissionClient;
         this.routePermissionPolicy = routePermissionPolicy;
+        this.gatewayMetrics = gatewayMetrics;
         this.signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         this.internalServiceToken = internalServiceToken;
     }
@@ -73,11 +77,13 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
 
         Claims claims = parseAccessClaims(request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION));
         if (claims == null) {
+            gatewayMetrics.recordUnauthorized();
             return reject(exchange, HttpStatus.UNAUTHORIZED);
         }
 
         String email = claims.get("email", String.class);
         if (email == null || email.isBlank()) {
+            gatewayMetrics.recordUnauthorized();
             return reject(exchange, HttpStatus.UNAUTHORIZED);
         }
 
@@ -89,6 +95,7 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
         return authPermissionClient.hasPermission(email, requiredPermission)
                 .flatMap(allowed -> {
                     if (!allowed) {
+                        gatewayMetrics.recordForbidden();
                         return reject(exchange, HttpStatus.FORBIDDEN);
                     }
                     return chain.filter(withVerifiedIdentity(exchange, claims));

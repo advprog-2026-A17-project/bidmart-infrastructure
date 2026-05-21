@@ -1,6 +1,8 @@
 package id.ac.ui.cs.advprog.bidmartgateway;
 
+import id.ac.ui.cs.advprog.bidmartgateway.metrics.GatewayMetrics;
 import id.ac.ui.cs.advprog.bidmartgateway.security.GatewayRateLimitFilter;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.http.HttpMethod;
@@ -13,9 +15,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class GatewayRateLimitFilterTest {
 
+    private static GatewayMetrics gatewayMetrics() {
+        return new GatewayMetrics(new SimpleMeterRegistry());
+    }
+
     @Test
     void loginShouldBeRateLimitedAfterConfiguredAttemptLimit() {
-        GatewayRateLimitFilter filter = new GatewayRateLimitFilter(2, 60);
+        GatewayRateLimitFilter filter = new GatewayRateLimitFilter(gatewayMetrics(), 2, 60);
         GatewayFilterChain chain = exchange -> Mono.empty();
 
         filter.filter(exchange(HttpMethod.POST, "/api/v1/auth/login"), chain).block();
@@ -29,7 +35,7 @@ class GatewayRateLimitFilterTest {
 
     @Test
     void protectedMutationRoutesShouldBeRateLimitedIndependently() {
-        GatewayRateLimitFilter filter = new GatewayRateLimitFilter(1, 60);
+        GatewayRateLimitFilter filter = new GatewayRateLimitFilter(gatewayMetrics(), 1, 60);
         GatewayFilterChain chain = exchange -> Mono.empty();
 
         filter.filter(exchange(HttpMethod.POST, "/api/v1/listings"), chain).block();

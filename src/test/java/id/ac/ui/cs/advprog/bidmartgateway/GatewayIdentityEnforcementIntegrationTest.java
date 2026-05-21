@@ -1,9 +1,10 @@
 package id.ac.ui.cs.advprog.bidmartgateway;
 
-import id.ac.ui.cs.advprog.bidmartgateway.security.AuthPermissionClient;
+import id.ac.ui.cs.advprog.bidmartgateway.metrics.GatewayMetrics;
 import id.ac.ui.cs.advprog.bidmartgateway.security.GatewayIdentityBodyGuardFilter;
 import id.ac.ui.cs.advprog.bidmartgateway.security.GatewayJwtAuthenticationFilter;
 import id.ac.ui.cs.advprog.bidmartgateway.security.RoutePermissionPolicy;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,7 @@ class GatewayIdentityEnforcementIntegrationTest {
     private final GatewayJwtAuthenticationFilter jwtFilter = new GatewayJwtAuthenticationFilter(
             (email, permission) -> Mono.just(true),
             ROUTE_PERMISSION_POLICY,
+            new GatewayMetrics(new SimpleMeterRegistry()),
             SECRET,
             INTERNAL_TOKEN
     );

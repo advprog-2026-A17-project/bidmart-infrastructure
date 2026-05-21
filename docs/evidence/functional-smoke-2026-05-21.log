@@ -1,0 +1,12 @@
+BidMart functional smoke
+Gateway:  http://localhost:8000
+Frontend: http://localhost
+Scope:    full
+
+- public catalogue search is reachable ... FAILED
+
+Functional smoke failed.
+GET http://localhost:8000/api/v1/catalogue/listings/search?page=0&size=1 could not reach http://localhost:8000/api/v1/catalogue/listings/search?page=0&size=1.
+{
+  "cause": "This operation was aborted"
+}

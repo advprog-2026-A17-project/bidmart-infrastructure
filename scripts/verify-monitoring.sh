@@ -5,6 +5,7 @@ set -euo pipefail
 GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:8000}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://127.0.0.1:9090}"
 GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3001}"
+GRAFANA_AUTH="${GRAFANA_AUTH:-}"
 
 COMPOSE_FILE="${COMPOSE_FILE:-$(cd "$(dirname "$0")/.." && pwd)/docker-compose.yml}"
 USE_DOCKER="${USE_DOCKER:-auto}"
@@ -29,12 +30,12 @@ docker_health() {
   local service="$2"
   local port="$3"
   local path="$4"
-  local url="http://127.0.0.1:${port}${path}"
-  if docker compose -f "$COMPOSE_FILE" exec -T "$service" sh -c \
-    "wget -qO- '$url' >/dev/null 2>&1 || curl -sf '$url' >/dev/null 2>&1"; then
-    log_ok "$name (docker:$service)"
+  local url="http://${service}:${port}${path}"
+  if docker compose -f "$COMPOSE_FILE" run --rm --no-deps curlimages/curl:8.5.0 \
+    -sf --max-time 5 "$url" >/dev/null 2>&1; then
+    log_ok "$name (network:${service})"
   else
-    log_fail "$name (docker:$service $url)"
+    log_fail "$name (network:${service} $url)"
   fi
 }
 
@@ -94,7 +95,11 @@ fi
 
 echo
 echo "-- Grafana (optional) --"
-if curl -sf --max-time 5 "${GRAFANA_URL}/api/health" | grep -q '"database":"ok"'; then
+grafana_curl_args=(-sf --max-time 5)
+if [[ -n "$GRAFANA_AUTH" ]]; then
+  grafana_curl_args=(-u "$GRAFANA_AUTH" "${grafana_curl_args[@]}")
+fi
+if curl "${grafana_curl_args[@]}" "${GRAFANA_URL}/api/health" | grep -Eq '"database"[[:space:]]*:[[:space:]]*"ok"'; then
   log_ok "Grafana API health (${GRAFANA_URL})"
 else
   log_fail "Grafana API health (${GRAFANA_URL})"

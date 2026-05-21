@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.bidmartgateway.security;
 
+import id.ac.ui.cs.advprog.bidmartgateway.metrics.GatewayMetrics;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -22,18 +23,21 @@ public class GatewayRateLimitFilter implements GlobalFilter, Ordered {
 
     private final ConcurrentMap<String, Window> windows = new ConcurrentHashMap<>();
     private final Clock clock;
+    private final GatewayMetrics gatewayMetrics;
     private final int maxAttempts;
     private final long windowSeconds;
 
     @Autowired
     public GatewayRateLimitFilter(
+            GatewayMetrics gatewayMetrics,
             @Value("${app.gateway.rate-limit.max-attempts:20}") int maxAttempts,
             @Value("${app.gateway.rate-limit.window-seconds:60}") long windowSeconds
     ) {
-        this(maxAttempts, windowSeconds, Clock.systemUTC());
+        this(gatewayMetrics, maxAttempts, windowSeconds, Clock.systemUTC());
     }
 
-    GatewayRateLimitFilter(int maxAttempts, long windowSeconds, Clock clock) {
+    GatewayRateLimitFilter(GatewayMetrics gatewayMetrics, int maxAttempts, long windowSeconds, Clock clock) {
+        this.gatewayMetrics = gatewayMetrics;
         this.maxAttempts = maxAttempts;
         this.windowSeconds = windowSeconds;
         this.clock = clock;
@@ -59,6 +63,7 @@ public class GatewayRateLimitFilter implements GlobalFilter, Ordered {
         });
 
         if (window.count() > maxAttempts) {
+            gatewayMetrics.recordRateLimited();
             exchange.getResponse().setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
             return exchange.getResponse().setComplete();
         }
