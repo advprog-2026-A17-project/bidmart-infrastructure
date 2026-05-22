@@ -6,8 +6,13 @@ VPS_HOST="${VPS_HOST:-43.157.208.68}"
 VPS_USER="${VPS_USER:-root}"
 REMOTE_EDGE_DIR="${REMOTE_EDGE_DIR:-/opt/bidmart/edge}"
 REMOTE_EDGE_ENV="${REMOTE_EDGE_ENV:-/etc/bidmart/edge.env}"
-SSH_TARGET="${VPS_USER}@${VPS_HOST}"
-SSH_OPTS="${SSH_OPTS:-}"
+if [[ -n "${BIDMART_SSH:-}" ]]; then
+  SSH_TARGET="${BIDMART_SSH}"
+  SSH_OPTS="${SSH_OPTS:-}"
+else
+  SSH_TARGET="${VPS_USER}@${VPS_HOST}"
+  SSH_OPTS="${SSH_OPTS:--p 22}"
+fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 ssh $SSH_OPTS "$SSH_TARGET" "mkdir -p '$REMOTE_EDGE_DIR'"
@@ -24,7 +29,11 @@ EOF
   fi
   cp '$REMOTE_EDGE_ENV' '$REMOTE_EDGE_DIR/.env'
   cd '$REMOTE_EDGE_DIR'
-  docker compose -f caddy-compose.yml --env-file .env up -d
+  DOCKER=docker
+  if ! docker info >/dev/null 2>&1; then
+    DOCKER=\"sudo docker\"
+  fi
+  \$DOCKER compose -f caddy-compose.yml --env-file .env up -d
 "
 
 echo "VPS edge deployed."

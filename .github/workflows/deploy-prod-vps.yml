@@ -1,0 +1,55 @@
+name: Deploy production VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: bidmart-prod-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy gRPC services to VPS
+    runs-on: ubuntu-latest
+    if: github.repository == 'advprog-2026-A17-project/bidmart-infrastructure'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH alias
+        env:
+          BIDMART_SSH_PRIVATE_KEY: ${{ secrets.BIDMART_SSH_PRIVATE_KEY }}
+          BIDMART_SSH_HOST: ${{ secrets.BIDMART_SSH_HOST || '43.157.208.68' }}
+          BIDMART_SSH_USER: ${{ secrets.BIDMART_SSH_USER || 'ubuntu' }}
+          BIDMART_SSH_PORT: ${{ secrets.BIDMART_SSH_PORT || '443' }}
+        run: |
+          test -n "$BIDMART_SSH_PRIVATE_KEY"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$BIDMART_SSH_PRIVATE_KEY" > ~/.ssh/bidmart_deploy_key
+          chmod 600 ~/.ssh/bidmart_deploy_key
+          ssh-keyscan -p "$BIDMART_SSH_PORT" "$BIDMART_SSH_HOST" >> ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host bidmart
+            HostName $BIDMART_SSH_HOST
+            User $BIDMART_SSH_USER
+            Port $BIDMART_SSH_PORT
+            IdentityFile ~/.ssh/bidmart_deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Deploy production
+        env:
+          BIDMART_SSH: bidmart
+          BIDMART_BRANCH: main
+        run: deploy/vps/deploy.sh prod
+
+      - name: Deploy edge proxy
+        env:
+          BIDMART_SSH: bidmart
+        run: deploy/vps/deploy-edge.sh prod
