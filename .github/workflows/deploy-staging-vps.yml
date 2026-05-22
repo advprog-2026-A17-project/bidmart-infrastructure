@@ -50,11 +50,6 @@ jobs:
         with:
           ref: ${{ steps.resolve.outputs.branch }}
 
-      - name: Set up Node.js for regression
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
       - name: Configure SSH alias
         env:
           BIDMART_SSH_PRIVATE_KEY: ${{ secrets.BIDMART_SSH_PRIVATE_KEY }}
@@ -95,7 +90,7 @@ jobs:
           BIDMART_SSH: bidmart
         run: deploy/vps/deploy-edge.sh
 
-      - name: Smoke test public gateway
+      - name: Smoke test staging gateway
         env:
           BIDMART_SSH: bidmart
         run: |
@@ -108,17 +103,6 @@ jobs:
             echo "Staging gateway not ready yet (attempt $i)"
             sleep 5
           done
-          echo "::error::Staging gateway never became healthy"
+          echo "::error::Staging gateway never became healthy; deploy.sh should have rolled back on the VPS"
           ssh bidmart "docker ps --format 'table {{.Names}}\t{{.Status}}' | head -30" || true
           exit 1
-
-      - name: Run full synthetic regression through staging edge
-        env:
-          BIDMART_GATEWAY_URL: ${{ vars.BIDMART_STAGING_GATEWAY_URL || 'https://bidmart-staging.43.157.208.68.sslip.io:8443' }}
-          BIDMART_FRONTEND_URL: ${{ vars.BIDMART_STAGING_FRONTEND_URL || 'https://bidmart-frontend.vercel.app' }}
-          BIDMART_E2E_ENV: staging
-          BIDMART_E2E_ADMIN_EMAIL: ${{ secrets.BIDMART_E2E_ADMIN_EMAIL }}
-          BIDMART_E2E_ADMIN_PASSWORD: ${{ secrets.BIDMART_E2E_ADMIN_PASSWORD }}
-          BIDMART_E2E_INTERNAL_TOKEN: ${{ secrets.BIDMART_E2E_INTERNAL_TOKEN || secrets.GATEWAY_INTERNAL_TOKEN }}
-          BIDMART_E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
-        run: node scripts/spec-regression.mjs --scope full

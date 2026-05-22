@@ -294,8 +294,12 @@ if [[ "$ENVIRONMENT" != "prod" ]]; then
   fi
 fi
 
-if ! run_spec_regression; then
-  automatic_rollback "scripts/spec-regression.mjs failed"
+if [[ "$ENVIRONMENT" == "prod" ]]; then
+  echo "[deploy] Skipping spec regression on production (validated on staging)"
+else
+  if ! run_spec_regression; then
+    automatic_rollback "scripts/spec-regression.mjs failed"
+  fi
 fi
 
 echo "[deploy] Deployment validation passed"

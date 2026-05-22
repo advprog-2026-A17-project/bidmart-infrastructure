@@ -26,7 +26,9 @@ This fits the project better than canary or full blue-green because the backend 
 
 ## Gates
 
-VPS deployment workflows are triggered by `workflow_run` after Continuous Integration succeeds. Direct push no longer starts a VPS deployment before CI finishes.
+- **Staging VPS:** `workflow_run` after CI succeeds on `staging`, or `repository_dispatch` from catalogue/auction/wallet. Full spec regression and monitoring smoke run on the VPS via `deploy/vps/deploy.sh`; failed validation triggers automatic image rollback.
+- **Production VPS:** manual only — run **Deploy production VPS** in `bidmart-infrastructure` with `confirm_promotion=promote` after staging is green. No spec regression on prod (health smoke only). `deploy.sh` still rolls back on failed readiness checks.
+- **Heroku / Vercel:** platform autodeploy from connected Git branches (`staging` / `main`).
 
 Production uses the GitHub `production` environment so repository maintainers can add reviewer approval in GitHub settings without changing the workflow file.
 
