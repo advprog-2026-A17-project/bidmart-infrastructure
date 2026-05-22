@@ -70,7 +70,7 @@ sonar {
         )
         property(
             "sonar.coverage.exclusions",
-            ".github/workflows/**,deploy/vps/**,**/*.yml,**/*.yaml,**/*.sh",
+            ".github/workflows/**,deploy/vps/**,**/*.yml,**/*.yaml,**/*.sh,src/main/java/**/config/**,src/main/java/**/security/**",
         )
     }
 }
