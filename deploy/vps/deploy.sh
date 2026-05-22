@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Deploy BidMart backend to a VPS with private Docker networking for gRPC.
-# Usage:
-#   deploy/vps/deploy.sh staging
-#   deploy/vps/deploy.sh prod
+# Deploy BidMart VPS backend (catalogue, auction, wallet, gateway).
+# Invoked by GitHub Actions only — see .github/workflows/deploy-*-vps.yml
 set -euo pipefail
+
+if [[ -z "${GITHUB_ACTIONS:-}" && -z "${ALLOW_LOCAL_VPS_DEPLOY:-}" ]]; then
+  echo "VPS deploy is CI/CD only. Push to staging on bidmart-infrastructure or run the deploy workflow in GitHub Actions." >&2
+  echo "Emergency local override: ALLOW_LOCAL_VPS_DEPLOY=1 $0 <staging|prod>" >&2
+  exit 2
+fi
 
 ENVIRONMENT="${1:-}"
 if [[ "$ENVIRONMENT" != "staging" && "$ENVIRONMENT" != "prod" ]]; then

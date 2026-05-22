@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# Deploy the shared VPS Caddy edge for staging and production gateway URLs.
+# Deploy the shared VPS Caddy edge (GitHub Actions CD only).
 set -euo pipefail
+
+if [[ -z "${GITHUB_ACTIONS:-}" && -z "${ALLOW_LOCAL_VPS_DEPLOY:-}" ]]; then
+  echo "Edge deploy is CI/CD only. Use GitHub Actions deploy-staging-vps / deploy-prod-vps workflows." >&2
+  exit 2
+fi
 
 VPS_HOST="${VPS_HOST:-43.157.208.68}"
 VPS_USER="${VPS_USER:-root}"
