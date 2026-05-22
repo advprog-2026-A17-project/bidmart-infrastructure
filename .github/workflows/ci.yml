@@ -6,6 +6,9 @@ on:
   push:
     branches: ["staging", "main"]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Run Tests
@@ -20,12 +23,12 @@ jobs:
           distribution: temurin
           cache: gradle
 
-      - name: Run Unit Tests
+      - name: Run unit tests and coverage gate
         run: |
           chmod +x gradlew
-          ./gradlew test jacocoTestReport
+          ./gradlew test jacocoTestReport jacocoTestCoverageVerification
 
-      - name: Upload Test And Coverage Artifacts
+      - name: Upload test and coverage artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -56,7 +59,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           if [ -z "${SONAR_TOKEN}" ]; then
-            echo "SONAR_TOKEN is not configured; skipping SonarCloud analysis."
+            echo "::warning::SONAR_TOKEN is not configured in repository secrets."
+            echo "Add SONAR_TOKEN from https://sonarcloud.io/account/security (org: advprog-2026-a17-project)."
             exit 0
           fi
           chmod +x gradlew
@@ -66,8 +70,10 @@ jobs:
           set -e
           if [ "${sonar_status}" -ne 0 ]; then
             if grep -qi "Automatic Analysis is enabled" sonar.log; then
-              echo "SonarCloud Automatic Analysis is enabled; skipping CI sonar scan."
+              echo "::warning::SonarCloud Automatic Analysis is enabled in the UI; disable it so CI analysis can run."
               exit 0
             fi
+            echo "::error::SonarCloud scan failed (exit ${sonar_status})."
             exit "${sonar_status}"
           fi
+          echo "SonarCloud analysis uploaded: https://sonarcloud.io/project/overview?id=advprog-2026-A17-project_bidmart-infrastructure"
