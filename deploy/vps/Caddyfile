@@ -17,7 +17,7 @@
 	}
 
 	handle {
-		reverse_proxy host.docker.internal:28000
+		reverse_proxy bidmart-prod-gateway-1:8000
 	}
 }
 
@@ -40,6 +40,6 @@
 	}
 
 	handle {
-		reverse_proxy host.docker.internal:18000
+		reverse_proxy bidmart-staging-gateway-1:8000
 	}
 }
