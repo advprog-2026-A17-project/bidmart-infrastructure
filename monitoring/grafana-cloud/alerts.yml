@@ -1,0 +1,106 @@
+# BidMart essential alert rules for Grafana Cloud Hosted Prometheus (Mimir).
+# Upload via:
+#   mimirtool rules sync --address=https://prometheus-prod-XX-prod-region.grafana.net \
+#                        --id=<GRAFANA_CLOUD_PROMETHEUS_USER> \
+#                        --key=<GRAFANA_CLOUD_API_KEY> \
+#                        monitoring/grafana-cloud/alerts.yml
+# Or copy each rule into Grafana Cloud UI -> Alerts -> Mimir-managed rules.
+#
+# Series produced by Alloy carry labels: job, env (staging|prod), platform (heroku|vps).
+
+namespace: bidmart
+groups:
+  - name: bidmart-availability
+    interval: 1m
+    rules:
+      - alert: BidMartServiceDown
+        expr: |
+          up{job=~"bidmart-.+", env=~"staging|prod"} == 0
+        for: 5m
+        labels:
+          severity: page
+          team: bidmart
+        annotations:
+          summary: "{{ $labels.job }} ({{ $labels.env }}) has been DOWN for 5 minutes"
+          description: "Alloy could not scrape /actuator/prometheus from {{ $labels.job }} {{ $labels.env }} on {{ $labels.platform }}. Check `heroku ps` or `docker ps` for the affected stack."
+
+      - alert: BidMartGatewayPublicDown
+        expr: |
+          probe_success{job=~"bidmart-gateway.*"} == 0
+        for: 5m
+        labels:
+          severity: page
+          team: bidmart
+        annotations:
+          summary: "Gateway public endpoint failing health probe ({{ $labels.env }})"
+          description: "External health probe of {{ $labels.instance }} has been failing for 5m. Verify Caddy edge + VPS gateway container."
+
+  - name: bidmart-application
+    interval: 1m
+    rules:
+      - alert: BidMartHttp5xxBurst
+        expr: |
+          (
+            sum by (job, env) (rate(http_server_requests_seconds_count{job=~"bidmart-.+", status=~"5..", env=~"staging|prod"}[5m]))
+            /
+            clamp_min(sum by (job, env) (rate(http_server_requests_seconds_count{job=~"bidmart-.+", env=~"staging|prod"}[5m])), 0.01)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          team: bidmart
+        annotations:
+          summary: "{{ $labels.job }} ({{ $labels.env }}) HTTP 5xx ratio > 5%"
+          description: "{{ $labels.job }} on {{ $labels.env }} is returning 5xx on more than 5% of requests over the last 10 minutes."
+
+      - alert: BidMartLatencyP95High
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, job, env) (rate(http_server_requests_seconds_bucket{job=~"bidmart-.+", env=~"staging|prod"}[5m]))
+          ) > 2
+        for: 15m
+        labels:
+          severity: warning
+          team: bidmart
+        annotations:
+          summary: "{{ $labels.job }} ({{ $labels.env }}) p95 latency > 2s"
+          description: "Sustained p95 latency over 2s for 15m. Consider scaling or checking downstream (Supabase pool, CloudAMQP, Heroku Eco dyno warm-up)."
+
+  - name: bidmart-infra
+    interval: 1m
+    rules:
+      - alert: BidMartHikariPoolExhausted
+        expr: |
+          hikaricp_connections_active{job=~"bidmart-.+", env=~"staging|prod"}
+          /
+          hikaricp_connections_max{job=~"bidmart-.+", env=~"staging|prod"} > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          team: bidmart
+        annotations:
+          summary: "Hikari pool > 90% saturated on {{ $labels.job }} ({{ $labels.env }})"
+          description: "Supabase Session Pooler caps at 15 connections; staging + prod share the same project. Lower SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE or check for connection leaks."
+
+      - alert: BidMartHerokuMemoryQuotaExceeded
+        expr: |
+          increase({platform="heroku"} |= "Error R14"[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          team: bidmart
+        annotations:
+          summary: "Heroku dyno hit R14 (memory quota exceeded) — {{ $labels.app }}"
+          description: "An Eco dyno reported R14 in the last 15m. Either raise the dyno tier or trim heap (-XX:MaxRAMPercentage)."
+
+      - alert: BidMartRabbitMqQueueBacklog
+        expr: |
+          rabbitmq_queue_messages_ready{job=~"bidmart-.+"} > 1000
+        for: 15m
+        labels:
+          severity: warning
+          team: bidmart
+        annotations:
+          summary: "RabbitMQ queue {{ $labels.queue }} backlog > 1000 ({{ $labels.env }})"
+          description: "Outbox or event queue is not draining. Check the consumer service logs."

@@ -1,98 +1,305 @@
-// Optional Grafana Alloy: remote_write to Grafana Cloud.
-// Scrape: VPS gateway (staging + prod) + Heroku auth/order (container apps).
-// Export GRAFANA_CLOUD_* and METRICS_BASIC_USER / METRICS_BASIC_PASSWORD.
+// =============================================================================
+// BidMart — Grafana Alloy unified observability agent (metrics + logs).
+//
+// Topology (2026-05-22):
+//   * Heroku (container stack)   : bidmart-auth(+staging), bidmart-order(+staging)
+//   * VPS (43.157.208.68:8443)   : gateway, catalogue, auction (rust), wallet (rust)
+//   * Frontend                   : Vercel (no scrape)
+//
+// One Alloy instance runs in the VPS docker-compose stack. It scrapes:
+//   - Heroku /actuator/prometheus (public HTTPS + basic auth)
+//   - VPS gateway /actuator/prometheus via public sslip.io edge (port 8443)
+//   - VPS internal services on the Docker network (catalogue / auction / wallet)
+//
+// It also collects logs:
+//   - All Docker containers running on the VPS via loki.source.docker
+//   - Heroku log drains (syslog-over-HTTPS) via loki.source.heroku
+//
+// All series and log lines are remote-written to Grafana Cloud Hosted Prometheus
+// and Hosted Loki. The agent itself is auth'd via env vars from
+// /etc/bidmart/grafana-cloud.env (see grafana-cloud.env.example).
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// 1. Remote write sinks (Grafana Cloud Hosted Prometheus + Loki)
+// -----------------------------------------------------------------------------
 
 prometheus.remote_write "grafana_cloud" {
-  endpoint {
-    url = env("GRAFANA_CLOUD_PROMETHEUS_URL")
+	endpoint {
+		url = sys.env("GRAFANA_CLOUD_PROMETHEUS_URL")
 
-    basic_auth {
-      username = env("GRAFANA_CLOUD_PROMETHEUS_USER")
-      password = env("GRAFANA_CLOUD_API_KEY")
-    }
-  }
+		basic_auth {
+			username = sys.env("GRAFANA_CLOUD_PROMETHEUS_USER")
+			password = sys.env("GRAFANA_CLOUD_API_KEY")
+		}
+	}
+
+	external_labels = {
+		cluster = "bidmart",
+		source  = "alloy-vps",
+	}
 }
 
-prometheus.scrape "gateway_staging" {
-  targets = [{
-    __address__ = "bidmart-staging.43.157.208.68.sslip.io:443",
-    job         = "bidmart-gateway-staging",
-  }]
-  scheme       = "https"
-  metrics_path = "/actuator/prometheus"
-  basic_auth {
-    username = env("METRICS_BASIC_USER")
-    password = env("METRICS_BASIC_PASSWORD")
-  }
-  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+loki.write "grafana_cloud" {
+	endpoint {
+		url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_CLOUD_LOKI_USER")
+			password = sys.env("GRAFANA_CLOUD_API_KEY")
+		}
+	}
+
+	external_labels = {
+		cluster = "bidmart",
+		source  = "alloy-vps",
+	}
 }
 
-prometheus.scrape "gateway_prod" {
-  targets = [{
-    __address__ = "bidmart-prod.43.157.208.68.sslip.io:443",
-    job         = "bidmart-gateway-prod",
-  }]
-  scheme       = "https"
-  metrics_path = "/actuator/prometheus"
-  basic_auth {
-    username = env("METRICS_BASIC_USER")
-    password = env("METRICS_BASIC_PASSWORD")
-  }
-  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+// -----------------------------------------------------------------------------
+// 2. Heroku Prometheus scrapes (auth + order, staging + prod)
+//    Public HTTPS endpoints, protected by METRICS_BASIC_USER/PASSWORD.
+// -----------------------------------------------------------------------------
+
+prometheus.scrape "heroku_auth_staging" {
+	targets = [{
+		__address__ = "bidmart-auth-staging-392ed0eda7b8.herokuapp.com:443",
+		job         = "bidmart-auth",
+		env         = "staging",
+		platform    = "heroku",
+	}]
+	scheme          = "https"
+	metrics_path    = "/actuator/prometheus"
+	scrape_interval = "30s"
+	scrape_timeout  = "15s"
+
+	basic_auth {
+		username = sys.env("METRICS_BASIC_USER")
+		password = sys.env("METRICS_BASIC_PASSWORD")
+	}
+	forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
-prometheus.scrape "auth_staging" {
-  targets = [{
-    __address__ = "bidmart-auth-staging-392ed0eda7b8.herokuapp.com:443",
-    job         = "bidmart-auth-staging",
-  }]
-  scheme       = "https"
-  metrics_path = "/actuator/prometheus"
-  basic_auth {
-    username = env("METRICS_BASIC_USER")
-    password = env("METRICS_BASIC_PASSWORD")
-  }
-  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+prometheus.scrape "heroku_auth_prod" {
+	targets = [{
+		__address__ = "bidmart-auth-876b62d83c69.herokuapp.com:443",
+		job         = "bidmart-auth",
+		env         = "prod",
+		platform    = "heroku",
+	}]
+	scheme          = "https"
+	metrics_path    = "/actuator/prometheus"
+	scrape_interval = "30s"
+	scrape_timeout  = "15s"
+
+	basic_auth {
+		username = sys.env("METRICS_BASIC_USER")
+		password = sys.env("METRICS_BASIC_PASSWORD")
+	}
+	forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
-prometheus.scrape "auth_prod" {
-  targets = [{
-    __address__ = "bidmart-auth-876b62d83c69.herokuapp.com:443",
-    job         = "bidmart-auth",
-  }]
-  scheme       = "https"
-  metrics_path = "/actuator/prometheus"
-  basic_auth {
-    username = env("METRICS_BASIC_USER")
-    password = env("METRICS_BASIC_PASSWORD")
-  }
-  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+prometheus.scrape "heroku_order_staging" {
+	targets = [{
+		__address__ = "bidmart-order-staging-a5fd01b90144.herokuapp.com:443",
+		job         = "bidmart-order",
+		env         = "staging",
+		platform    = "heroku",
+	}]
+	scheme          = "https"
+	metrics_path    = "/actuator/prometheus"
+	scrape_interval = "30s"
+	scrape_timeout  = "15s"
+
+	basic_auth {
+		username = sys.env("METRICS_BASIC_USER")
+		password = sys.env("METRICS_BASIC_PASSWORD")
+	}
+	forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
-prometheus.scrape "order_staging" {
-  targets = [{
-    __address__ = "bidmart-order-staging-a5fd01b90144.herokuapp.com:443",
-    job         = "bidmart-order-staging",
-  }]
-  scheme       = "https"
-  metrics_path = "/actuator/prometheus"
-  basic_auth {
-    username = env("METRICS_BASIC_USER")
-    password = env("METRICS_BASIC_PASSWORD")
-  }
-  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+prometheus.scrape "heroku_order_prod" {
+	targets = [{
+		__address__ = "bidmart-order-ced842eeb858.herokuapp.com:443",
+		job         = "bidmart-order",
+		env         = "prod",
+		platform    = "heroku",
+	}]
+	scheme          = "https"
+	metrics_path    = "/actuator/prometheus"
+	scrape_interval = "30s"
+	scrape_timeout  = "15s"
+
+	basic_auth {
+		username = sys.env("METRICS_BASIC_USER")
+		password = sys.env("METRICS_BASIC_PASSWORD")
+	}
+	forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
-prometheus.scrape "order_prod" {
-  targets = [{
-    __address__ = "bidmart-order-ced842eeb858.herokuapp.com:443",
-    job         = "bidmart-order",
-  }]
-  scheme       = "https"
-  metrics_path = "/actuator/prometheus"
-  basic_auth {
-    username = env("METRICS_BASIC_USER")
-    password = env("METRICS_BASIC_PASSWORD")
-  }
-  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+// -----------------------------------------------------------------------------
+// 3. VPS gateway scrapes (public sslip.io edge, port 8443 because SSH owns 443)
+// -----------------------------------------------------------------------------
+
+prometheus.scrape "vps_gateway_staging" {
+	targets = [{
+		__address__ = "bidmart-staging.43.157.208.68.sslip.io:8443",
+		job         = "bidmart-gateway",
+		env         = "staging",
+		platform    = "vps",
+	}]
+	scheme          = "https"
+	metrics_path    = "/actuator/prometheus"
+	scrape_interval = "30s"
+	scrape_timeout  = "15s"
+
+	basic_auth {
+		username = sys.env("METRICS_BASIC_USER")
+		password = sys.env("METRICS_BASIC_PASSWORD")
+	}
+	forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "vps_gateway_prod" {
+	targets = [{
+		__address__ = "bidmart-prod.43.157.208.68.sslip.io:8443",
+		job         = "bidmart-gateway",
+		env         = "prod",
+		platform    = "vps",
+	}]
+	scheme          = "https"
+	metrics_path    = "/actuator/prometheus"
+	scrape_interval = "30s"
+	scrape_timeout  = "15s"
+
+	basic_auth {
+		username = sys.env("METRICS_BASIC_USER")
+		password = sys.env("METRICS_BASIC_PASSWORD")
+	}
+	forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+// -----------------------------------------------------------------------------
+// 4. VPS internal scrapes (catalogue / auction / wallet) via Docker network.
+//    Alloy joins both bidmart-staging_default and bidmart-prod_default networks
+//    (see docker-compose.monitoring.yml).
+// -----------------------------------------------------------------------------
+
+// 4a. Java internal services (catalogue) — /actuator/prometheus
+prometheus.scrape "vps_internal_java_staging" {
+	targets = [
+		{__address__ = "bidmart-staging-catalogue-service-1:8081", job = "bidmart-catalogue", env = "staging", platform = "vps"},
+	]
+	metrics_path    = "/actuator/prometheus"
+	scrape_interval = "30s"
+	scrape_timeout  = "15s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "vps_internal_java_prod" {
+	targets = [
+		{__address__ = "bidmart-prod-catalogue-service-1:8081", job = "bidmart-catalogue", env = "prod", platform = "vps"},
+	]
+	metrics_path    = "/actuator/prometheus"
+	scrape_interval = "30s"
+	scrape_timeout  = "15s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+// 4b. Rust internal services (auction, wallet) — /metrics
+prometheus.scrape "vps_internal_rust_staging" {
+	targets = [
+		{__address__ = "bidmart-staging-auction-service-1:8082", job = "bidmart-auction", env = "staging", platform = "vps"},
+		{__address__ = "bidmart-staging-wallet-service-1:8083", job = "bidmart-wallet", env = "staging", platform = "vps"},
+	]
+	metrics_path    = "/metrics"
+	scrape_interval = "30s"
+	scrape_timeout  = "15s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.scrape "vps_internal_rust_prod" {
+	targets = [
+		{__address__ = "bidmart-prod-auction-service-1:8082", job = "bidmart-auction", env = "prod", platform = "vps"},
+		{__address__ = "bidmart-prod-wallet-service-1:8083", job = "bidmart-wallet", env = "prod", platform = "vps"},
+	]
+	metrics_path    = "/metrics"
+	scrape_interval = "30s"
+	scrape_timeout  = "15s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+// -----------------------------------------------------------------------------
+// 5. Docker log discovery + collection (all VPS containers).
+// -----------------------------------------------------------------------------
+
+discovery.docker "vps_containers" {
+	host             = "unix:///var/run/docker.sock"
+	refresh_interval = "15s"
+}
+
+discovery.relabel "vps_containers" {
+	targets = discovery.docker.vps_containers.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/(.*)"
+		target_label  = "container"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+		target_label  = "compose_project"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		target_label  = "service"
+	}
+
+	rule {
+		source_labels = ["compose_project"]
+		regex         = "bidmart-(staging|prod)"
+		target_label  = "env"
+		replacement   = "$1"
+	}
+
+	rule {
+		target_label = "platform"
+		replacement  = "vps"
+	}
+}
+
+loki.source.docker "vps" {
+	host       = "unix:///var/run/docker.sock"
+	targets    = discovery.relabel.vps_containers.output
+	labels     = {job = "bidmart-vps-docker"}
+	forward_to = [loki.write.grafana_cloud.receiver]
+}
+
+// -----------------------------------------------------------------------------
+// 6. Heroku log drain receiver (HTTPS — fed by `heroku drains:add` per app).
+//    Heroku posts syslog-formatted lines to this endpoint; we expose it on the
+//    VPS edge under /heroku-drain/<app>?token=... (see Caddyfile patch).
+// -----------------------------------------------------------------------------
+
+loki.source.heroku "drain" {
+	http {
+		listen_address = "0.0.0.0"
+		listen_port    = 8087
+	}
+	labels     = {job = "bidmart-heroku-drain"}
+	forward_to = [loki.write.grafana_cloud.receiver]
+}
+
+// -----------------------------------------------------------------------------
+// 7. Alloy self-observability (so we can alert on the agent itself).
+// -----------------------------------------------------------------------------
+
+prometheus.exporter.self "alloy" { }
+
+prometheus.scrape "alloy_self" {
+	targets         = prometheus.exporter.self.alloy.targets
+	scrape_interval = "60s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
 }
