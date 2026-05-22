@@ -53,11 +53,16 @@ services:
       GATEWAY_WALLET_SERVICE_URL: ${GATEWAY_WALLET_SERVICE_URL:-lb://wallet-service}
       GATEWAY_ORDER_SERVICE_URL: ${GATEWAY_ORDER_SERVICE_URL:-lb://order-notification-service}
     depends_on:
-      - auth-service
-      - catalogue-service
-      - auction-service
-      - wallet-service
-      - order-notification-service
+      auth-service:
+        condition: service_healthy
+      catalogue-service:
+        condition: service_healthy
+      auction-service:
+        condition: service_started
+      wallet-service:
+        condition: service_started
+      order-notification-service:
+        condition: service_started
     restart: ${RESTART_POLICY:-unless-stopped}
 
   swagger-ui:
@@ -104,6 +109,7 @@ services:
       AUTH_INTERNAL_SERVICE_TOKEN: ${AUTH_INTERNAL_SERVICE_TOKEN:-bidmart-local-internal-token}
       AUTH_PASSWORD_RESET_BASE_URL: ${AUTH_PASSWORD_RESET_BASE_URL:-http://localhost:5173/reset-password}
       AUTH_AUDIT_EXCHANGE: ${AUTH_AUDIT_EXCHANGE:-bidmart.auth.events}
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
     depends_on:
       auth-db:
         condition: service_healthy
@@ -111,6 +117,12 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 15s
+      retries: 12
+      start_period: 60s
     restart: ${RESTART_POLICY:-unless-stopped}
 
   catalogue-service:
@@ -136,6 +148,12 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
     restart: ${RESTART_POLICY:-unless-stopped}
 
   auction-service:
@@ -159,7 +177,7 @@ services:
       - auction-rust-data:/data
     depends_on:
       catalogue-service:
-        condition: service_started
+        condition: service_healthy
       wallet-service:
         condition: service_started
       auction-db:
@@ -234,11 +252,19 @@ services:
       BIDMART_AUTH_BASE_URL: ${BIDMART_AUTH_BASE_URL:-http://auth-service:8080}
       BIDMART_AUTH_INTERNAL_SERVICE_TOKEN: ${AUTH_INTERNAL_SERVICE_TOKEN:-bidmart-local-internal-token}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-bidmart-auth-secret-key-bidmart-auth-secret-key}
+      SPRING_PROFILES_ACTIVE: ${ORDER_SPRING_PROFILES_ACTIVE:-local}
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
     depends_on:
       order-db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 15s
+      retries: 12
+      start_period: 60s
     restart: ${RESTART_POLICY:-unless-stopped}
 
   prometheus:

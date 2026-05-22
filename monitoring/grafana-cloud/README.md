@@ -104,6 +104,27 @@ up{job=~"bidmart-.*"}
 
 All series should be `1` while Heroku dynos are awake.
 
+## 4b. VPS staging / production scrape (official runtime)
+
+After `deploy/vps/deploy.sh` and `deploy-edge.sh`, scrape the **gateway** Prometheus endpoint (Caddy routes to the active stack). Set the same `METRICS_BASIC_USER` / `METRICS_BASIC_PASSWORD` in `/etc/bidmart/staging.env` and `prod.env`.
+
+| Environment | Scrape URL | Job name |
+|-------------|------------|----------|
+| Staging | `https://bidmart-staging.43.157.208.68.sslip.io/actuator/prometheus` | `bidmart-gateway-staging` |
+| Production | `https://bidmart-prod.43.157.208.68.sslip.io/actuator/prometheus` | `bidmart-gateway-prod` |
+
+Optional per-service jobs (internal metrics via edge path or VPN): mirror [../prometheus/prometheus.yml](../prometheus/prometheus.yml) service names.
+
+Promotion gate before enabling prod scrape:
+
+```bash
+./scripts/verify-grpc-private.sh
+USE_DOCKER=true ./scripts/verify-monitoring.sh
+BIDMART_GATEWAY_URL=https://bidmart-staging.43.157.208.68.sslip.io node scripts/functional-smoke.mjs
+```
+
+Evidence filenames: `docs/evidence/grafana-cloud-targets-2026-05-22.png`, `grafana-cloud-overview-2026-05-22.png`.
+
 ## 5. Deploy order (with observability)
 
 1. Deploy Heroku backend apps (container stack + config vars).

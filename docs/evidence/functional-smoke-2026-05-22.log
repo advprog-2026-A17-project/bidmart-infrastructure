@@ -1,0 +1,28 @@
+BidMart functional smoke
+Gateway:  http://localhost:8000
+Frontend: http://localhost:5173
+Scope:    full
+
+- public catalogue search is reachable ... OK (1646ms)
+- bidding listing route is reachable through the gateway ... OK (59ms)
+- seller can log in ... OK (3989ms)
+- buyer can log in ... OK (877ms)
+- admin can log in ... FAILED
+Skipping admin checks: admin credentials not provided or login failed.
+- authenticated bidding listing endpoint is reachable ... OK (173ms)
+- buyer wallet exists ... OK (358ms)
+- buyer wallet can be topped up through sandbox intent ... OK (877ms)
+- seller can create a catalogue listing ... OK (526ms)
+- seller can publish the listing ... OK (106ms)
+- wait for catalogue auction window to open ... OK (3004ms)
+- seller can open listing auction session ... OK (750ms)
+- buyer can place a bid backed by wallet hold ... OK (205ms)
+- catalogue reflects bid price update ... OK (1108ms)
+- listing can settle after its end time ... OK (119502ms)
+- buyer wallet detail remains readable after auction lifecycle ... OK (105ms)
+- buyer order exists after auction win ... OK (152288ms)
+- buyer order status is CREATED after win ... OK (1ms)
+
+Functional smoke passed.
+Created listing: 805c7bba-38f1-4a50-88c3-19d312d4a2a8
+Listing auction session: 805c7bba-38f1-4a50-88c3-19d312d4a2a8

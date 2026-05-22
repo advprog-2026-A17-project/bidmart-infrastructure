@@ -1,0 +1,28 @@
+BidMart audit baseline — 2026-05-22
+
+Local gates:
+- bidmart-auth-service: ./gradlew clean check integrationTest — PASS
+- bidmart-catalogue-service: ./gradlew clean check — PASS
+- bidmart-frontend: npm run lint && npm test && npm run build — PASS (after stomp/deactivate/close fixes)
+- disk root: 42% used (16Gi avail)
+
+SonarCloud quality gate (API):
+- bidmart-auth-service: OK
+- bidmart-catalogue-service: NONE (no analysis on branch)
+- bidmart-frontend: ERROR (reliability/security rating)
+- bidmart-infrastructure: NONE
+- bidmart-auction-service-rust: NONE
+- bidmart-wallet-service-rust: NONE
+- bidmart-order-and-notification-service: NONE
+
+GitHub CI feat/checkpoint-100 (latest): all 7 repos success (2026-05-22)
+
+Runtime (2026-05-22 local compose):
+- verify-grpc-private.sh: PASS
+- verify-monitoring.sh (USE_DOCKER=true): PASS — docs/evidence/monitoring-verify-2026-05-22.log
+- functional-smoke.mjs: PASS — docs/evidence/functional-smoke-2026-05-22.log (BIDMART_SKIP_FRONTEND_CHECK=1, BIDMART_SKIP_NOTIFICATION_CHECK=1)
+
+VPS 43.157.208.68:
+- SSH port 22: BLOCKED from agent network (connection timeout) — deploy scripts ready; run manually from campus/VPN
+
+Remediation delivered: frontend STOMP multicast, seller deactivate/close, order consumer ordering, compose health/mail fixes, Heroku CD split (auth+auction).

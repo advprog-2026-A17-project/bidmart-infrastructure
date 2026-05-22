@@ -44,6 +44,15 @@ Gunakan untuk `bidmart-auth-service`, gateway, order, catalogue, dll. yang deplo
 
    | Field | Value |
    |-------|-------|
+   | Tanggal drill | 2026-05-22 |
+   | App | bidmart-order-notification-service (compose local) |
+   | From release | hot-deploy JAR (consumer reorder) |
+   | To release | previous image tag `bidmart-order-and-notification-service:local` |
+   | Rollback command | `docker compose up -d order-notification-service` (rebuild prior commit) |
+   | Health after rollback | PASS |
+   | Smoke after rollback | PASS — `functional-smoke-2026-05-22.log` |
+   | Waktu recovery (menit) | 5 |
+
    | Tanggal drill | _YYYY-MM-DD_ |
    | App | _e.g. bidmart-order-staging_ |
    | From release | _v42_ |

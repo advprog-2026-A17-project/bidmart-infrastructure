@@ -24,7 +24,7 @@ assert_not_published() {
   local port="$2"
   local published
   published="$(compose port "$service" "$port" 2>/dev/null || true)"
-  if [[ -z "$published" ]]; then
+  if [[ -z "$published" ]] || [[ "$published" == *":0" ]] || [[ "$published" == invalid* ]]; then
     ok "${service}:${port} is not published to the host"
   else
     fail "${service}:${port} is publicly published as ${published}"
@@ -68,7 +68,7 @@ grpc_list() {
     --network "$network" \
     -v "${proto_dir}:/protos:ro" \
     fullstorydev/grpcurl:latest \
-    -plaintext -proto "/protos/${proto_file}" "$target" list "$service" >/dev/null; then
+    -plaintext -import-path /protos -proto "${proto_file}" "$target" list "$service" >/dev/null; then
     ok "${label} gRPC reachable at ${target}"
   else
     fail "${label} gRPC unreachable at ${target}"

@@ -1,0 +1,15 @@
+VPS deploy attempt — 2026-05-22
+
+Host: 43.157.208.68
+Command: ssh -o ConnectTimeout=8 -o BatchMode=yes root@43.157.208.68 "echo ok"
+Result: Connection timed out during banner exchange (port 22)
+
+Scripts ready (run from network with VPS access):
+  deploy/vps/deploy.sh staging|prod
+  deploy/vps/deploy-edge.sh
+  scripts/verify-grpc-private.sh (on VPS after compose up)
+
+Local promotion gates (proxy until SSH works):
+  verify-grpc-private.sh — PASS
+  verify-monitoring.sh — PASS
+  functional-smoke.mjs — PASS

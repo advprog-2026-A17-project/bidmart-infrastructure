@@ -98,8 +98,15 @@ docker_health() {
   local port="$3"
   local path="$4"
   local url="http://${service}:${port}${path}"
-  if docker compose -f "$COMPOSE_FILE" run --rm --no-deps curlimages/curl:8.5.0 \
-    -sf --max-time 5 "$url" >/dev/null 2>&1; then
+  local probe_container="${MONITOR_PROBE_CONTAINER:-}"
+  if [[ -z "$probe_container" ]]; then
+    probe_container="$(docker compose -f "$COMPOSE_FILE" ps -q gateway 2>/dev/null | head -1)"
+  fi
+  if [[ -z "$probe_container" ]]; then
+    log_fail "$name (no gateway container for network probe)"
+    return
+  fi
+  if docker exec "$probe_container" wget -qO- --timeout=5 "$url" >/dev/null 2>&1; then
     log_ok "$name (network:${service})"
   else
     log_fail "$name (network:${service} $url)"
