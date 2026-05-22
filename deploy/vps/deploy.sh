@@ -45,7 +45,7 @@ REMOTE_ROOT="$3"
 REMOTE_ENV_FILE="$4"
 shift 4
 
-if [[ ! -f "$REMOTE_ENV_FILE" ]]; then
+if ! test -f "$REMOTE_ENV_FILE" && ! sudo test -f "$REMOTE_ENV_FILE"; then
   echo "Missing env file: $REMOTE_ENV_FILE" >&2
   echo "Create it from bidmart-infrastructure/deploy/vps/env.${ENVIRONMENT}.example and fill secrets." >&2
   exit 3
@@ -65,7 +65,12 @@ for entry in "$@"; do
   git -C "$name" pull --ff-only origin "$BRANCH"
 done
 
-cp "$REMOTE_ENV_FILE" "$REMOTE_ROOT/bidmart-infrastructure/.env"
+if [[ -r "$REMOTE_ENV_FILE" ]]; then
+  cp "$REMOTE_ENV_FILE" "$REMOTE_ROOT/bidmart-infrastructure/.env"
+else
+  sudo cp "$REMOTE_ENV_FILE" "$REMOTE_ROOT/bidmart-infrastructure/.env"
+  sudo chown "$(id -u):$(id -g)" "$REMOTE_ROOT/bidmart-infrastructure/.env"
+fi
 cd "$REMOTE_ROOT/bidmart-infrastructure"
 
 set -a
