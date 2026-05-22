@@ -62,6 +62,10 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
             return chain.filter(stripIdentityHeaders(exchange));
         }
 
+        if (hasValidInternalToken(request)) {
+            return chain.filter(withInternalServiceToken(exchange));
+        }
+
         if (isPublicRoute(request.getMethod(), path)) {
             return chain.filter(stripIdentityHeaders(exchange));
         }
@@ -155,6 +159,20 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
         return exchange.mutate().request(request).build();
     }
 
+    private ServerWebExchange withInternalServiceToken(ServerWebExchange exchange) {
+        ServerHttpRequest request = exchange.getRequest()
+                .mutate()
+                .headers(headers -> {
+                    headers.remove(HEADER_USER_ID);
+                    headers.remove(HEADER_USER_EMAIL);
+                    headers.remove(HEADER_USER_ROLES);
+                    headers.set(HEADER_INTERNAL_TOKEN, internalServiceToken);
+                    headers.computeIfAbsent(HEADER_CORRELATION_ID, ignored -> List.of(UUID.randomUUID().toString()));
+                })
+                .build();
+        return exchange.mutate().request(request).build();
+    }
+
     private ServerWebExchange withVerifiedIdentity(ServerWebExchange exchange, Claims claims) {
         ServerHttpRequest request = exchange.getRequest()
                 .mutate()
@@ -171,6 +189,13 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
                 })
                 .build();
         return exchange.mutate().request(request).build();
+    }
+
+    private boolean hasValidInternalToken(ServerHttpRequest request) {
+        String token = request.getHeaders().getFirst(HEADER_INTERNAL_TOKEN);
+        return internalServiceToken != null
+                && !internalServiceToken.isBlank()
+                && internalServiceToken.equals(token);
     }
 
     private String rolesHeader(Claims claims) {

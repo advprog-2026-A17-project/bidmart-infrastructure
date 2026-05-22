@@ -71,6 +71,42 @@ class GatewayJwtAuthenticationFilterTest {
     }
 
     @Test
+    void validInternalServiceTokenShouldBypassJwtAndForwardToken() {
+        GatewayJwtAuthenticationFilter filter = createFilter(permissionClient(false));
+        AtomicReference<ServerWebExchange> forwardedExchange = new AtomicReference<>();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/wallet/seller-escrow")
+                        .header("X-Internal-Service-Token", INTERNAL_TOKEN)
+                        .header("X-User-Id", "spoofed-user")
+                        .header("X-User-Email", "spoofed@test.com")
+                        .header("X-User-Roles", "ADMIN")
+        );
+
+        filter.filter(exchange, captureChain(forwardedExchange)).block();
+
+        HttpHeaders headers = forwardedExchange.get().getRequest().getHeaders();
+        assertEquals(INTERNAL_TOKEN, headers.getFirst("X-Internal-Service-Token"));
+        assertNull(headers.getFirst("X-User-Id"));
+        assertNull(headers.getFirst("X-User-Email"));
+        assertNull(headers.getFirst("X-User-Roles"));
+        assertTrue(headers.containsKey("X-Correlation-Id"));
+        assertNull(exchange.getResponse().getStatusCode());
+    }
+
+    @Test
+    void invalidInternalServiceTokenShouldStillRequireJwt() {
+        GatewayJwtAuthenticationFilter filter = createFilter(permissionClient(true));
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/wallet/seller-escrow")
+                        .header("X-Internal-Service-Token", "wrong-token")
+        );
+
+        filter.filter(exchange, successChain()).block();
+
+        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+    }
+
+    @Test
     void protectedRouteShouldPreserveExistingCorrelationId() {
         GatewayJwtAuthenticationFilter filter = createFilter(permissionClient(true));
         String token = token("user-1", "buyer@test.com", List.of("BUYER"));
