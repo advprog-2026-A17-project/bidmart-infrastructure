@@ -157,6 +157,7 @@ See also [../../../SCREENSHOT_CAPTURE_GUIDE.md](../../../SCREENSHOT_CAPTURE_GUID
 
 ## Related docs
 
+- [SCRAPE_TARGETS.md](./SCRAPE_TARGETS.md) — current Heroku + VPS scrape URLs (2026-05-22)
 - [../../docs/10. Monitoring.md](../../docs/10.%20Monitoring.md) — metrics catalog & PromQL
 - [../../docs/15. Deployment.md](../../docs/15.%20Deployment.md) — Heroku app status
 - [../../docs/4. Software Deployment.md](../../docs/4.%20Software%20Deployment.md) — gateway CI/CD
