@@ -35,7 +35,9 @@ public class ActuatorMetricsSecurityConfig {
                     .authorizeExchange(exchanges -> exchanges.anyExchange().authenticated())
                     .httpBasic(Customizer.withDefaults());
         }
-        http.csrf(ServerHttpSecurity.CsrfSpec::disable);
+        http.csrf(ServerHttpSecurity.CsrfSpec::disable)
+            .cors(Customizer.withDefaults())
+            .headers(headers -> headers.permissionsPolicy(permissions -> permissions.disable()));
         return http.build();
     }
 
@@ -44,7 +46,9 @@ public class ActuatorMetricsSecurityConfig {
     SecurityWebFilterChain permitAllSecurity(ServerHttpSecurity http) {
         http
                 .authorizeExchange(exchanges -> exchanges.anyExchange().permitAll())
-                .csrf(ServerHttpSecurity.CsrfSpec::disable);
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .cors(Customizer.withDefaults())
+                .headers(headers -> headers.permissionsPolicy(permissions -> permissions.disable()));
         return http.build();
     }
 
