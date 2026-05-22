@@ -26,7 +26,7 @@ jobs:
       - name: Run unit tests and coverage gate
         run: |
           chmod +x gradlew
-          ./gradlew test jacocoTestReport jacocoTestCoverageVerification
+          ./gradlew clean test jacocoTestReport jacocoTestCoverageVerification --no-daemon --stacktrace
 
       - name: Upload test and coverage artifacts
         if: always()

@@ -106,7 +106,11 @@ async function main() {
             label: 'catalogue search',
         });
         if (!config.skipFrontend) {
-            await request(config.frontendUrl, { expectedStatuses: [200], label: 'frontend shell' });
+            await request(config.frontendUrl, {
+                expectedStatuses: [200],
+                headers: { Accept: 'text/html' },
+                label: 'frontend shell',
+            });
         }
     });
 

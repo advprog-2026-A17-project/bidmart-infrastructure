@@ -30,8 +30,8 @@ class PlatformComposeContractTest {
         assertTrue(gatewayConfig.contains("uri: ${GATEWAY_ORDER_SERVICE_URL:lb://order-notification-service}"));
         assertTrue(gatewayConfig.contains("Path=/ws/notifications/**"));
         assertTrue(gatewayConfig.contains("spring-cloud-starter-loadbalancer") || ContractFileReader.read("build.gradle.kts").contains("spring-cloud-starter-loadbalancer"));
-        assertTrue(compose.contains("GATEWAY_AUTH_SERVICE_URL: ${GATEWAY_AUTH_SERVICE_URL:-lb://auth-service}"));
-        assertTrue(compose.contains("GATEWAY_ORDER_SERVICE_URL: ${GATEWAY_ORDER_SERVICE_URL:-lb://order-notification-service}"));
+        assertTrue(compose.contains("GATEWAY_AUTH_SERVICE_URL: http://auth-service:8080"));
+        assertTrue(compose.contains("GATEWAY_ORDER_SERVICE_URL: http://order-notification-service:8084"));
         assertTrue(compose.contains("expose:"));
     }
 

@@ -5,9 +5,9 @@ import { execSync } from 'node:child_process';
 const DEFAULT_GATEWAY_URL = 'http://localhost:8000';
 const SMOKE_AUTO_PASSWORD = 'BidmartSmoke1!';
 
-const toCatalogueDateTime = (ms) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+const toCatalogueDateTime = (ms) => new Date(ms).toISOString();
 const DEFAULT_FRONTEND_URL = 'http://localhost:5173';
-const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_TIMEOUT_MS = 200_000;
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 
@@ -80,7 +80,10 @@ async function main() {
 
     if (!config.skipFrontend) {
         await step('frontend shell is reachable', () => {
-            return request(config.frontendUrl, { expectedStatuses: [200] });
+            return request(config.frontendUrl, {
+                expectedStatuses: [200],
+                headers: { Accept: 'text/html' },
+            });
         });
     }
 
@@ -111,43 +114,54 @@ async function main() {
     await step('buyer wallet exists', () => ensureWallet(buyer));
     await step('buyer wallet can be topped up through sandbox intent', () => topUpBuyerWallet(buyer));
 
-    const listing = await step('seller can create a catalogue listing', () => createListing(seller));
-    await step('seller can publish the listing', () => publishListing(seller, listing.id));
-
-    await step('wait for catalogue auction window to open', async () => {
-        await sleep(3_000);
+    const normalOrder = await runAuctionWinFlow({
+        seller,
+        buyer,
+        label: 'normal order',
+        bidAmount: 505,
+        checkNotification: !config.skipNotifications,
     });
-
-    const session = await step('seller can open listing auction session', () => openListingAuctionSession(seller, listing.id));
-    if (session.id !== listing.id) {
-        throw new SmokeError('Listing auction session id must match catalogue listing id.', {
-            listingId: listing.id,
-            sessionId: session.id,
-        });
-    }
-
-    await step('buyer can place a bid backed by wallet hold', () => placeBid(buyer, listing.id));
-    await step('catalogue reflects bid price update', () => waitForListingPrice(listing.id, 505));
-    const settled = await step('listing can settle after its end time', () => closeListingAfterEnd(seller, listing.id));
-    const auctionStatus = String(settled?.status || '').toUpperCase();
-    if (auctionStatus !== 'WON') {
-        throw new SmokeError('Expected auction to close as WON for win-path smoke.', {
-            listingId: listing.id,
-            status: auctionStatus,
-            settled,
-        });
-    }
-
-    await step('buyer wallet detail remains readable after auction lifecycle', () => ensureWallet(buyer));
-
-    if (!config.skipNotifications) {
-        await step('buyer receives an auction notification', () => waitForAuctionNotification(buyer, listing.id));
-    }
-
-    const winOrder = await step('buyer order exists after auction win', () =>
-        waitForBuyerOrder(buyer, seller, listing.id, 505)
+    await step('normal order can be packed by seller', () => updateOrderStatus(seller, normalOrder.id, 'PACKED'));
+    await step('normal order can be shipped by seller', () => updateOrderStatus(seller, normalOrder.id, 'SHIPPED'));
+    await step('normal order confirmation credits seller held escrow', () =>
+        confirmOrderAndExpectSellerEscrow(buyer, seller, normalOrder, 505)
     );
-    await step('buyer order status is CREATED after win', () => verifyWinOrderCreated(winOrder));
+
+    if (admin) {
+        const buyerDisputeOrder = await runAuctionWinFlow({
+            seller,
+            buyer,
+            label: 'buyer-win dispute order',
+            bidAmount: 515,
+            checkNotification: false,
+        });
+        await step('buyer-win dispute order can be shipped', async () => {
+            await updateOrderStatus(seller, buyerDisputeOrder.id, 'PACKED');
+            return updateOrderStatus(seller, buyerDisputeOrder.id, 'SHIPPED');
+        });
+        await step('buyer can open dispute for buyer-win order', () => openOrderDispute(buyer, buyerDisputeOrder.id));
+        await step('admin resolving buyer-win dispute refunds buyer wallet', () =>
+            resolveDisputeAndExpectBuyerRefund(admin, buyer, seller, buyerDisputeOrder, 'BUYER', 515)
+        );
+
+        const sellerDisputeOrder = await runAuctionWinFlow({
+            seller,
+            buyer,
+            label: 'seller-win dispute order',
+            bidAmount: 525,
+            checkNotification: false,
+        });
+        await step('seller-win dispute order can be shipped', async () => {
+            await updateOrderStatus(seller, sellerDisputeOrder.id, 'PACKED');
+            return updateOrderStatus(seller, sellerDisputeOrder.id, 'SHIPPED');
+        });
+        await step('buyer can open dispute for seller-win order', () => openOrderDispute(buyer, sellerDisputeOrder.id));
+        await step('admin resolving seller-win dispute credits seller held escrow', () =>
+            resolveDisputeAndExpectSellerEscrow(admin, seller, sellerDisputeOrder, 'SELLER', 525)
+        );
+    } else {
+        console.log('Skipping dispute smoke checks: admin credentials not provided or login failed.');
+    }
 
     // If admin credentials were provided, validate an admin-only endpoint
     if (admin) {
@@ -162,6 +176,50 @@ async function main() {
     console.log('Functional smoke passed.');
     console.log(`Created listing: ${state.createdListingId}`);
     console.log(`Listing auction session: ${state.createdAuctionId ?? state.createdListingId}`);
+}
+
+async function runAuctionWinFlow({ seller, buyer, label, bidAmount, checkNotification }) {
+    const listing = await step(`${label}: seller can create a catalogue listing`, () => createListing(seller));
+    await step(`${label}: seller can publish the listing`, () => publishListing(seller, listing.id));
+
+    await step(`${label}: wait for catalogue auction window to open`, async () => {
+        await sleep(3_000);
+    });
+
+    const session = await step(`${label}: seller can open listing auction session`, () =>
+        openListingAuctionSession(seller, listing.id, bidAmount)
+    );
+    if (session.id !== listing.id) {
+        throw new SmokeError('Listing auction session id must match catalogue listing id.', {
+            listingId: listing.id,
+            sessionId: session.id,
+        });
+    }
+
+    await step(`${label}: buyer can place a bid backed by wallet hold`, () => placeBid(buyer, listing.id, bidAmount));
+    await step(`${label}: catalogue reflects bid price update`, () => waitForListingPrice(listing.id, bidAmount));
+    const settled = await step(`${label}: listing can settle after its end time`, () =>
+        closeListingAfterEnd(seller, listing.id)
+    );
+    const auctionStatus = String(settled?.status || '').toUpperCase();
+    if (auctionStatus !== 'WON') {
+        throw new SmokeError('Expected auction to close as WON for win-path smoke.', {
+            listingId: listing.id,
+            status: auctionStatus,
+            settled,
+        });
+    }
+
+    await step(`${label}: buyer wallet detail remains readable after auction lifecycle`, () => ensureWallet(buyer));
+
+    if (checkNotification) {
+        await step(`${label}: buyer receives an auction notification`, () => waitForAuctionNotification(buyer, listing.id));
+    }
+
+    const order = await step(`${label}: buyer order exists after auction win`, () =>
+        waitForBuyerOrder(buyer, seller, listing.id, bidAmount)
+    );
+    return step(`${label}: buyer order status is CREATED after win`, () => verifyWinOrderCreated(order));
 }
 
 async function authenticateActor(role) {
@@ -222,7 +280,8 @@ if (typeof main !== 'undefined') {
 }
 
 async function ensureWallet(actor) {
-    const detailPath = `/api/v1/wallet/${encodeURIComponent(actor.user.id)}/detail`;
+    const role = walletRole(actor);
+    const detailPath = `/api/v1/wallet/${encodeURIComponent(actor.user.id)}/detail?role=${encodeURIComponent(role)}`;
     const detail = await api(detailPath, {
         actor,
         expectedStatuses: [200, 404],
@@ -238,6 +297,7 @@ async function ensureWallet(actor) {
         actor,
         body: {
             userId: actor.user.id,
+            role,
             activeBalance: 0,
             heldBalance: 0,
         },
@@ -327,10 +387,11 @@ async function publishListing(seller, listingId) {
     });
 }
 
-async function openListingAuctionSession(seller, listingId) {
+async function openListingAuctionSession(seller, listingId, bidAmount = 505) {
     const now = Date.now();
     const startTime = Math.floor(now / 1000) - 1;
     const endTime = Math.floor((now + (config.auctionLifetimeSeconds + 5) * 1_000) / 1000);
+    const startingPriceCents = (bidAmount - 5) * 100;
 
     const result = await api('/api/v1/listings', {
         method: 'POST',
@@ -339,8 +400,8 @@ async function openListingAuctionSession(seller, listingId) {
             listingId,
             sellerId: seller.user.id,
             auctionType: 'ENGLISH',
-            starting_price_cents: 50_000,
-            reserve_price_cents: 50_000,
+            starting_price_cents: startingPriceCents,
+            reserve_price_cents: startingPriceCents,
             minimum_increment_cents: 500,
             startTime,
             endTime,
@@ -354,13 +415,13 @@ async function openListingAuctionSession(seller, listingId) {
     return { id: sessionId, endTime, payload: result.payload };
 }
 
-async function placeBid(buyer, listingId) {
+async function placeBid(buyer, listingId, bidAmount = 505) {
     const result = await api(`/api/v1/listings/${encodeURIComponent(listingId)}/bids`, {
         method: 'POST',
         actor: buyer,
         body: {
             bidderId: buyer.user.id,
-            bidAmount: 505,
+            bidAmount,
         },
         expectedStatuses: [201],
         label: 'place bid',
@@ -452,6 +513,154 @@ function verifyWinOrderCreated(order) {
         throw new SmokeError(`Expected win-path order status CREATED but got ${status}.`, { order });
     }
     return order;
+}
+
+async function updateOrderStatus(seller, orderId, status) {
+    const body = status === 'SHIPPED'
+        ? { status, trackingNumber: `TRK-${Date.now()}`, carrier: 'Smoke Carrier' }
+        : { status, carrier: 'Smoke Carrier' };
+    const result = await api(`/api/v1/orders/${encodeURIComponent(orderId)}/status`, {
+        method: 'PUT',
+        actor: seller,
+        body,
+        label: `update order ${orderId} to ${status}`,
+    });
+    const actualStatus = String(result.payload?.status || '').toUpperCase();
+    if (actualStatus !== status) {
+        throw new SmokeError(`Expected order ${orderId} status ${status} but got ${actualStatus}.`, {
+            order: result.payload,
+        });
+    }
+    return result.payload;
+}
+
+async function openOrderDispute(buyer, orderId) {
+    const result = await api(`/api/v1/orders/${encodeURIComponent(orderId)}/dispute`, {
+        method: 'POST',
+        actor: buyer,
+        body: {
+            reason: 'Functional smoke dispute',
+            details: 'Buyer reported an issue so admin resolution can be verified.',
+        },
+        label: `open dispute ${orderId}`,
+    });
+    const status = String(result.payload?.status || '').toUpperCase();
+    if (status !== 'DISPUTED') {
+        throw new SmokeError(`Expected order ${orderId} to become DISPUTED but got ${status}.`, {
+            order: result.payload,
+        });
+    }
+    return result.payload;
+}
+
+async function confirmOrderAndExpectSellerEscrow(buyer, seller, order, amount) {
+    const before = await ensureWallet(seller);
+    const beforeHeld = walletHeldBalance(before);
+    const beforeActive = walletActiveBalance(before);
+
+    const result = await api(`/api/v1/orders/${encodeURIComponent(order.id)}/confirm`, {
+        method: 'POST',
+        actor: buyer,
+        label: `confirm order ${order.id}`,
+    });
+    const status = String(result.payload?.status || '').toUpperCase();
+    if (status !== 'CONFIRMED') {
+        throw new SmokeError(`Expected order ${order.id} to become CONFIRMED but got ${status}.`, {
+            order: result.payload,
+        });
+    }
+
+    await expectSellerEscrowDelta(seller, beforeHeld, beforeActive, amount, `normal confirmation ${order.id}`);
+    return result.payload;
+}
+
+async function resolveDisputeAndExpectBuyerRefund(admin, buyer, seller, order, winner, amount) {
+    const beforeBuyer = await ensureWallet(buyer);
+    const beforeSeller = await ensureWallet(seller);
+    const beforeBuyerActive = walletActiveBalance(beforeBuyer);
+    const beforeSellerHeld = walletHeldBalance(beforeSeller);
+
+    const resolved = await resolveOrderDispute(admin, order.id, winner);
+    const status = String(resolved?.status || '').toUpperCase();
+    if (status !== 'REFUNDED') {
+        throw new SmokeError(`Expected buyer-win dispute order ${order.id} to become REFUNDED but got ${status}.`, {
+            order: resolved,
+        });
+    }
+
+    const afterBuyer = await ensureWallet(buyer);
+    const afterSeller = await ensureWallet(seller);
+    const afterBuyerActive = walletActiveBalance(afterBuyer);
+    const afterSellerHeld = walletHeldBalance(afterSeller);
+    if (afterBuyerActive < beforeBuyerActive + amount) {
+        throw new SmokeError('Buyer wallet was not refunded after buyer-win dispute.', {
+            orderId: order.id,
+            beforeBuyerActive,
+            afterBuyerActive,
+            amount,
+        });
+    }
+    if (afterSellerHeld !== beforeSellerHeld) {
+        throw new SmokeError('Seller held balance changed on buyer-win dispute.', {
+            orderId: order.id,
+            beforeSellerHeld,
+            afterSellerHeld,
+        });
+    }
+    return resolved;
+}
+
+async function resolveDisputeAndExpectSellerEscrow(admin, seller, order, winner, amount) {
+    const before = await ensureWallet(seller);
+    const beforeHeld = walletHeldBalance(before);
+    const beforeActive = walletActiveBalance(before);
+
+    const resolved = await resolveOrderDispute(admin, order.id, winner);
+    const status = String(resolved?.status || '').toUpperCase();
+    if (status !== 'CONFIRMED') {
+        throw new SmokeError(`Expected seller-win dispute order ${order.id} to become CONFIRMED but got ${status}.`, {
+            order: resolved,
+        });
+    }
+
+    await expectSellerEscrowDelta(seller, beforeHeld, beforeActive, amount, `seller-win dispute ${order.id}`);
+    return resolved;
+}
+
+async function resolveOrderDispute(admin, orderId, winner) {
+    const result = await api(`/api/v1/orders/${encodeURIComponent(orderId)}/dispute/resolve`, {
+        method: 'POST',
+        actor: admin,
+        body: { winner },
+        label: `resolve dispute ${orderId}`,
+    });
+    const actualWinner = String(result.payload?.disputeWinner || '').toUpperCase();
+    if (actualWinner !== winner) {
+        throw new SmokeError(`Expected dispute winner ${winner} but got ${actualWinner}.`, {
+            order: result.payload,
+        });
+    }
+    return result.payload;
+}
+
+async function expectSellerEscrowDelta(seller, beforeHeld, beforeActive, amount, label) {
+    const after = await ensureWallet(seller);
+    const afterHeld = walletHeldBalance(after);
+    const afterActive = walletActiveBalance(after);
+    if (afterHeld < beforeHeld + amount) {
+        throw new SmokeError(`Seller held escrow was not credited after ${label}.`, {
+            beforeHeld,
+            afterHeld,
+            amount,
+        });
+    }
+    if (afterActive !== beforeActive) {
+        throw new SmokeError(`Seller active balance changed before payout delay after ${label}.`, {
+            beforeActive,
+            afterActive,
+        });
+    }
+    return after;
 }
 
 async function waitForAuctionNotification(buyer, auctionId) {
@@ -591,6 +800,25 @@ function walletActiveBalance(detailPayload) {
     return balance;
 }
 
+function walletHeldBalance(detailPayload) {
+    const wallet = detailPayload?.wallet || detailPayload;
+    const balance = Number(wallet?.heldBalance ?? wallet?.held_balance);
+    if (!Number.isFinite(balance)) {
+        throw new SmokeError('Wallet detail response did not include held balance.', { payload: detailPayload });
+    }
+    return balance;
+}
+
+function walletRole(actor) {
+    const roles = Array.isArray(actor?.user?.roles)
+        ? actor.user.roles.map((item) => String(item.name || item).toUpperCase())
+        : [];
+    if (roles.includes('SELLER')) {
+        return 'SELLER';
+    }
+    return 'BUYER';
+}
+
 function assertRole(user, role) {
     const roleNames = Array.isArray(user.roles)
         ? user.roles.map((item) => String(item.name || item).toUpperCase())
@@ -654,9 +882,10 @@ function triggerOrderFallbackDocker(payload) {
 
 function verifyAuthUserForSmoke(email, role) {
     const dbContainer = env.BIDMART_AUTH_DB_CONTAINER || 'bidmart-auth-db-1';
+    const adminRoleId = '00000000-0000-0000-0000-000000000000';
     const sellerRoleId = '00000000-0000-0000-0000-000000000002';
     const buyerRoleId = '00000000-0000-0000-0000-000000000001';
-    const roleId = role === 'SELLER' ? sellerRoleId : buyerRoleId;
+    const roleId = role === 'ADMIN' ? adminRoleId : role === 'SELLER' ? sellerRoleId : buyerRoleId;
     const escapedEmail = email.replace(/'/g, "''");
 
     const sql = [
