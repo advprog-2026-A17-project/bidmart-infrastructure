@@ -97,18 +97,23 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
         }
 
         Mono<Boolean> permissionCheck = authPermissionClient.hasPermission(email, requiredPermission);
-        if (requiredPermission.startsWith("admin:")) {
-            permissionCheck = permissionCheck.flatMap(allowed -> allowed
-                    ? Mono.just(true)
-                    : authPermissionClient.hasPermission(email, "admin:*"));
-        }
 
         return permissionCheck.flatMap(allowed -> {
-                    if (!allowed) {
+                    if (allowed) {
+                        return chain.filter(withVerifiedIdentity(exchange, claims));
+                    }
+                    if (!requiresElevatedPermission(requiredPermission)) {
                         gatewayMetrics.recordForbidden();
                         return reject(exchange, HttpStatus.FORBIDDEN);
                     }
-                    return chain.filter(withVerifiedIdentity(exchange, claims));
+                    return authPermissionClient.hasPermission(email, "admin:*")
+                            .flatMap(escalated -> {
+                                if (!escalated) {
+                                    gatewayMetrics.recordForbidden();
+                                    return reject(exchange, HttpStatus.FORBIDDEN);
+                                }
+                                return chain.filter(withVerifiedIdentity(exchange, claims));
+                            });
                 });
     }
 
@@ -219,6 +224,12 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
         return normalized.equals("/api/v1/listings")
                 || normalized.matches("^/api/v1/listings/[^/]+$")
                 || normalized.matches("^/api/v1/listings/[^/]+/bids$");
+    }
+
+    private boolean requiresElevatedPermission(String requiredPermission) {
+        return requiredPermission.startsWith("admin:")
+                || "wallet:view".equals(requiredPermission)
+                || "wallet:mutate".equals(requiredPermission);
     }
 
     private Mono<Void> reject(ServerWebExchange exchange, HttpStatus status) {

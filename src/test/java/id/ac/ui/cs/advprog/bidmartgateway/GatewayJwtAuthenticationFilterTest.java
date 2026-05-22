@@ -87,6 +87,27 @@ class GatewayJwtAuthenticationFilterTest {
     }
 
     @Test
+    void walletRouteShouldAllowAdminWildcardWhenWalletPermissionMissing() {
+        GatewayJwtAuthenticationFilter filter = createFilter(selectivePermissionClient());
+        String token = token(
+                "00000000-0000-0000-0000-300000000001",
+                "admin@bidmart.com",
+                List.of("ADMIN")
+        );
+        AtomicReference<ServerWebExchange> forwardedExchange = new AtomicReference<>();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/wallet/00000000-0000-0000-0000-300000000001/detail")
+                        .queryParam("role", "BUYER")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+        );
+
+        filter.filter(exchange, captureChain(forwardedExchange)).block();
+
+        assertNull(exchange.getResponse().getStatusCode());
+        assertEquals("00000000-0000-0000-0000-300000000001", forwardedExchange.get().getRequest().getHeaders().getFirst("X-User-Id"));
+    }
+
+    @Test
     void routeShouldRejectJwtWhenRequiredPermissionIsDenied() {
         GatewayJwtAuthenticationFilter filter = createFilter(permissionClient(false));
         String token = token("seller-1", "seller@test.com", List.of("SELLER"));
@@ -188,6 +209,15 @@ class GatewayJwtAuthenticationFilterTest {
 
     private AuthPermissionClient permissionClient(boolean allowed) {
         return (email, permission) -> Mono.just(allowed);
+    }
+
+    private AuthPermissionClient selectivePermissionClient() {
+        return (email, permission) -> {
+            if ("admin:*".equals(permission)) {
+                return Mono.just("admin@bidmart.com".equals(email));
+            }
+            return Mono.just(false);
+        };
     }
 
     private GatewayFilterChain successChain() {
