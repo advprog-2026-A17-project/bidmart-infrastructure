@@ -7,7 +7,13 @@ on:
     paths:
       - 'deploy/**'
       - 'docker-compose.yml'
+      - 'monitoring/**'
       - 'scripts/**'
+      - 'src/**'
+      - 'Dockerfile'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'heroku.yml'
       - '.github/workflows/deploy-staging-vps.yml'
   repository_dispatch:
     types: [deploy-vps-staging]
@@ -33,7 +39,10 @@ jobs:
           BIDMART_SSH_USER: ${{ secrets.BIDMART_SSH_USER || 'ubuntu' }}
           BIDMART_SSH_PORT: ${{ secrets.BIDMART_SSH_PORT || '443' }}
         run: |
-          test -n "$BIDMART_SSH_PRIVATE_KEY"
+          if [ -z "$BIDMART_SSH_PRIVATE_KEY" ]; then
+            echo "::error::BIDMART_SSH_PRIVATE_KEY repository secret is not configured."
+            exit 1
+          fi
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$BIDMART_SSH_PRIVATE_KEY" > ~/.ssh/bidmart_deploy_key
@@ -47,10 +56,12 @@ jobs:
             IdentityFile ~/.ssh/bidmart_deploy_key
             IdentitiesOnly yes
             StrictHostKeyChecking yes
+            ServerAliveInterval 30
+            ServerAliveCountMax 5
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Deploy staging
+      - name: Deploy staging stack
         env:
           BIDMART_SSH: bidmart
           BIDMART_BRANCH: staging
@@ -60,3 +71,20 @@ jobs:
         env:
           BIDMART_SSH: bidmart
         run: deploy/vps/deploy-edge.sh
+
+      - name: Smoke test public gateway
+        env:
+          BIDMART_SSH: bidmart
+        run: |
+          set -e
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if ssh bidmart "curl -fsS --max-time 5 http://127.0.0.1:18000/actuator/health"; then
+              echo "Staging gateway healthy"
+              exit 0
+            fi
+            echo "Staging gateway not ready yet (attempt $i)"
+            sleep 5
+          done
+          echo "::error::Staging gateway never became healthy"
+          ssh bidmart "docker ps --format 'table {{.Names}}\t{{.Status}}' | head -30" || true
+          exit 1

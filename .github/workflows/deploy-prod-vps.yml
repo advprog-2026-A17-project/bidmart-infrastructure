@@ -2,6 +2,13 @@ name: Deploy production VPS
 
 on:
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Git branch to deploy (default staging — promotes staging-tested commit)'
+        required: false
+        default: 'staging'
+  repository_dispatch:
+    types: [deploy-vps-prod]
 
 concurrency:
   group: bidmart-prod-vps
@@ -9,12 +16,24 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy gRPC services to VPS
+    name: Deploy production stack
     runs-on: ubuntu-latest
     if: github.repository == 'advprog-2026-A17-project/bidmart-infrastructure'
+    environment:
+      name: production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Resolve branch
+        id: resolve
+        env:
+          INPUT_BRANCH: ${{ github.event.inputs.branch }}
+        run: |
+          branch="${INPUT_BRANCH:-staging}"
+          if [ -z "$branch" ]; then branch=staging; fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "Deploying branch: $branch"
 
       - name: Configure SSH alias
         env:
@@ -23,7 +42,10 @@ jobs:
           BIDMART_SSH_USER: ${{ secrets.BIDMART_SSH_USER || 'ubuntu' }}
           BIDMART_SSH_PORT: ${{ secrets.BIDMART_SSH_PORT || '443' }}
         run: |
-          test -n "$BIDMART_SSH_PRIVATE_KEY"
+          if [ -z "$BIDMART_SSH_PRIVATE_KEY" ]; then
+            echo "::error::BIDMART_SSH_PRIVATE_KEY repository secret is not configured."
+            exit 1
+          fi
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$BIDMART_SSH_PRIVATE_KEY" > ~/.ssh/bidmart_deploy_key
@@ -37,16 +59,35 @@ jobs:
             IdentityFile ~/.ssh/bidmart_deploy_key
             IdentitiesOnly yes
             StrictHostKeyChecking yes
+            ServerAliveInterval 30
+            ServerAliveCountMax 5
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Deploy production
+      - name: Deploy production stack
         env:
           BIDMART_SSH: bidmart
-          BIDMART_BRANCH: staging
+          BIDMART_BRANCH: ${{ steps.resolve.outputs.branch }}
         run: deploy/vps/deploy.sh prod
 
       - name: Deploy edge proxy
         env:
           BIDMART_SSH: bidmart
         run: deploy/vps/deploy-edge.sh
+
+      - name: Smoke test public gateway
+        env:
+          BIDMART_SSH: bidmart
+        run: |
+          set -e
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if ssh bidmart "curl -fsS --max-time 5 http://127.0.0.1:28000/actuator/health"; then
+              echo "Production gateway healthy"
+              exit 0
+            fi
+            echo "Production gateway not ready yet (attempt $i)"
+            sleep 5
+          done
+          echo "::error::Production gateway never became healthy"
+          ssh bidmart "docker ps --format 'table {{.Names}}\t{{.Status}}' | head -30" || true
+          exit 1

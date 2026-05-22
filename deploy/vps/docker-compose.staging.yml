@@ -50,6 +50,9 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${CATALOGUE_DDL_AUTO:-update}
       BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
       SPRING_RABBITMQ_ADDRESSES: ${SPRING_RABBITMQ_URL:-${RABBITMQ_URL:-}}
+      BIDMART_JWT_SECRET: ${AUTH_JWT_SECRET:-}
+      GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health >/dev/null 2>&1 || exit 1"]
       interval: 10s
@@ -103,4 +106,18 @@ services:
       PORT: 8083
       GRPC_PORT: 50051
       AUCTION_SERVICE_BASE_URL: http://auction-service:8082/api/v1/listings
+      MIDTRANS_SANDBOX_BASE_URL: ${MIDTRANS_SANDBOX_BASE_URL:-https://api.sandbox.midtrans.com}
+      MIDTRANS_CHARGE_URL: ${MIDTRANS_CHARGE_URL:-https://api.sandbox.midtrans.com/v2/charge}
+      MIDTRANS_STATUS_BASE_URL: ${MIDTRANS_STATUS_BASE_URL:-https://api.sandbox.midtrans.com/v2}
+      MIDTRANS_BCA_VA_SIMULATOR_URL: ${MIDTRANS_BCA_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/bca/va/index}
+      MIDTRANS_BNI_VA_SIMULATOR_URL: ${MIDTRANS_BNI_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/bni/va/index}
+      MIDTRANS_BRI_VA_SIMULATOR_URL: ${MIDTRANS_BRI_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/bri/va/index}
+      MIDTRANS_PERMATA_VA_SIMULATOR_URL: ${MIDTRANS_PERMATA_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/openapi/va/index}
+      MIDTRANS_MANDIRI_BILL_SIMULATOR_URL: ${MIDTRANS_MANDIRI_BILL_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/openapi/mandiri/index}
+      MIDTRANS_QRIS_SIMULATOR_URL: ${MIDTRANS_QRIS_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/qris/index}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-}
+      MIDTRANS_IRIS_BASE_URL: ${MIDTRANS_IRIS_BASE_URL:-https://app.sandbox.midtrans.com/iris/api/v1}
+      MIDTRANS_IRIS_API_KEY: ${MIDTRANS_IRIS_API_KEY:-}
+      MIDTRANS_IRIS_MERCHANT_KEY: ${MIDTRANS_IRIS_MERCHANT_KEY:-}
     restart: ${RESTART_POLICY:-unless-stopped}
