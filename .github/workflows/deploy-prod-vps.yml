@@ -1,19 +1,18 @@
 name: Deploy production VPS
 
-# Production is promoted manually after staging validation (workflow_dispatch only).
-# No automatic prod deploy on push to main. No synthetic regression against prod.
-
 on:
+  workflow_run:
+    workflows: ["Continuous Integration"]
+    branches: [main]
+    types: [completed]
   workflow_dispatch:
     inputs:
       branch:
         description: 'Git branch to deploy on the VPS (default main)'
         required: false
         default: 'main'
-      confirm_promotion:
-        description: 'Type promote to confirm staging was validated'
-        required: true
-        default: ''
+  repository_dispatch:
+    types: [deploy-vps-prod]
 
 concurrency:
   group: bidmart-prod-vps
@@ -21,26 +20,35 @@ concurrency:
 
 jobs:
   deploy:
-    name: Promote VPS production stack
+    name: Deploy VPS production stack
     runs-on: ubuntu-latest
-    if: github.repository == 'advprog-2026-A17-project/bidmart-infrastructure' && github.event.inputs.confirm_promotion == 'promote'
+    if: github.repository == 'advprog-2026-A17-project/bidmart-infrastructure' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     environment:
       name: production
     steps:
       - name: Resolve branch
         id: resolve
+        env:
+          INPUT_BRANCH: ${{ github.event.inputs.branch }}
+          CLIENT_BRANCH: ${{ github.event.client_payload.branch }}
+          WORKFLOW_RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          branch="${{ github.event.inputs.branch }}"
-          if [ -z "$branch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_run" ] && [ -n "$WORKFLOW_RUN_BRANCH" ]; then
+            branch="$WORKFLOW_RUN_BRANCH"
+          elif [ -n "$INPUT_BRANCH" ]; then
+            branch="$INPUT_BRANCH"
+          elif [ -n "$CLIENT_BRANCH" ]; then
+            branch="$CLIENT_BRANCH"
+          else
             branch=main
           fi
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          echo "Promoting VPS prod from branch: $branch"
+          echo "Deploying VPS prod from branch: $branch"
 
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.resolve.outputs.branch }}
+          ref: ${{ github.event.workflow_run.head_sha || steps.resolve.outputs.branch }}
 
       - name: Configure SSH alias
         env:
@@ -96,7 +104,7 @@ jobs:
             echo "Production gateway not ready yet (attempt $i)"
             sleep 5
           done
-          echo "::error::Production gateway never became healthy; deploy.sh should have rolled back on the VPS"
+          echo "::error::Production gateway never became healthy"
           ssh bidmart "docker ps --format 'table {{.Names}}\t{{.Status}}' | head -30" || true
           exit 1
 
@@ -112,14 +120,4 @@ jobs:
             sleep 5
           done
           echo "::error::Production public edge never became healthy"
-          exit 1
-
-  gate:
-    name: Promotion confirmation required
-    runs-on: ubuntu-latest
-    if: github.repository == 'advprog-2026-A17-project/bidmart-infrastructure' && github.event.inputs.confirm_promotion != 'promote'
-    steps:
-      - name: Fail without promotion keyword
-        run: |
-          echo "::error::Production deploy aborted. Re-run workflow and set confirm_promotion to 'promote' after staging validation."
           exit 1
