@@ -19,15 +19,25 @@ ssh $SSH_OPTS "$SSH_TARGET" "mkdir -p '$REMOTE_EDGE_DIR'"
 scp $SSH_OPTS "$SCRIPT_DIR/Caddyfile" "$SCRIPT_DIR/caddy-compose.yml" "${SSH_TARGET}:${REMOTE_EDGE_DIR}/"
 
 ssh $SSH_OPTS "$SSH_TARGET" "set -euo pipefail
-  if [ ! -f '$REMOTE_EDGE_ENV' ]; then
-    cat >'$REMOTE_EDGE_ENV' <<'EOF'
+  if ! test -f '$REMOTE_EDGE_ENV' && ! sudo test -f '$REMOTE_EDGE_ENV' 2>/dev/null; then
+    tmp_env=\$(mktemp)
+    cat >\"\$tmp_env\" <<'EOF'
 BIDMART_PROD_HOST=bidmart-prod.43.157.208.68.sslip.io
 BIDMART_STAGING_HOST=bidmart-staging.43.157.208.68.sslip.io
 PUBLIC_HTTP_PORT=80
 PUBLIC_HTTPS_PORT=443
 EOF
+    sudo mkdir -p \"\$(dirname '$REMOTE_EDGE_ENV')\"
+    sudo mv \"\$tmp_env\" '$REMOTE_EDGE_ENV'
+    sudo chown root:root '$REMOTE_EDGE_ENV'
+    sudo chmod 600 '$REMOTE_EDGE_ENV'
   fi
-  cp '$REMOTE_EDGE_ENV' '$REMOTE_EDGE_DIR/.env'
+  if [ -r '$REMOTE_EDGE_ENV' ]; then
+    cp '$REMOTE_EDGE_ENV' '$REMOTE_EDGE_DIR/.env'
+  else
+    sudo cp '$REMOTE_EDGE_ENV' '$REMOTE_EDGE_DIR/.env'
+    sudo chown \"\$(id -u):\$(id -g)\" '$REMOTE_EDGE_DIR/.env'
+  fi
   cd '$REMOTE_EDGE_DIR'
   DOCKER=docker
   if ! docker info >/dev/null 2>&1; then
