@@ -20,9 +20,9 @@ This fits the project better than canary or full blue-green because the backend 
 | Catalogue | VPS Docker Compose | service CI success dispatches infrastructure deploy | service CI success dispatches infrastructure deploy |
 | Auction | VPS Docker Compose | service CI success dispatches infrastructure deploy | service CI success dispatches infrastructure deploy |
 | Wallet | VPS Docker Compose | service CI success dispatches infrastructure deploy | service CI success dispatches infrastructure deploy |
-| Auth | Heroku container | `deploy-heroku.yml` after CI on `staging` | `deploy-heroku.yml` after CI on `main` |
-| Order/Notification | Heroku container | `deploy-heroku.yml` after CI on `staging` | `deploy-heroku.yml` after CI on `main` |
-| Frontend | Vercel | `deploy-vercel.yml` after CI on `staging` (preview) | `deploy-vercel.yml` after CI on `main` (`--prod`) |
+| Auth | Heroku | Heroku app connected to `staging` | Heroku app connected to `main` |
+| Order/Notification | Heroku | Heroku app connected to `staging` | Heroku app connected to `main` |
+| Frontend | Vercel | preview/staging deployment from non-production branch | production deployment from `main` |
 
 ## Gates
 
