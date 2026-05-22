@@ -100,38 +100,206 @@ else
   COMPOSE_FILE="docker-compose.yml"
 fi
 
+DEPLOY_TS="$(date -u +%Y%m%dT%H%M%SZ)"
+DEPLOY_LOG_DIR="$REMOTE_ROOT/bidmart-infrastructure/deploy/logs"
+DEPLOY_LOG="$DEPLOY_LOG_DIR/${ENVIRONMENT}-${DEPLOY_TS}.log"
+ROLLBACK_ENV_FILE="$REMOTE_ROOT/bidmart-infrastructure/.rollback-${ENVIRONMENT}-${DEPLOY_TS}.env"
+mkdir -p "$DEPLOY_LOG_DIR"
+exec > >(tee -a "$DEPLOY_LOG") 2>&1
+
+image_var_for_service() {
+  case "$1" in
+    gateway) echo "GATEWAY_IMAGE" ;;
+    catalogue-service) echo "CATALOGUE_IMAGE" ;;
+    auction-service) echo "AUCTION_IMAGE" ;;
+    wallet-service) echo "WALLET_IMAGE" ;;
+    *) return 1 ;;
+  esac
+}
+
+capture_rollback_images() {
+  : >"$ROLLBACK_ENV_FILE"
+  local captured=0
+  local services=(gateway catalogue-service auction-service wallet-service)
+
+  echo "[deploy] Capturing rollback image tags before deployment"
+  for service in "${services[@]}"; do
+    local cid image_id image_var rollback_tag
+    cid="$($DOCKER compose -f "$COMPOSE_FILE" --env-file .env ps -q "$service" 2>/dev/null || true)"
+    if [[ -z "$cid" ]]; then
+      echo "[deploy] No running container found for $service; rollback image unavailable"
+      continue
+    fi
+
+    image_id="$($DOCKER inspect -f '{{.Image}}' "$cid" 2>/dev/null || true)"
+    if [[ -z "$image_id" ]]; then
+      echo "[deploy] Could not inspect image for $service; rollback image unavailable"
+      continue
+    fi
+
+    image_var="$(image_var_for_service "$service")"
+    rollback_tag="bidmart-rollback-${ENVIRONMENT}-${service}:${DEPLOY_TS}"
+    $DOCKER image tag "$image_id" "$rollback_tag"
+    printf '%s=%s\n' "$image_var" "$rollback_tag" >>"$ROLLBACK_ENV_FILE"
+    echo "[deploy] Rollback snapshot: $service -> $rollback_tag"
+    captured=$((captured + 1))
+  done
+
+  if [[ "$captured" -eq 0 ]]; then
+    rm -f "$ROLLBACK_ENV_FILE"
+    echo "[deploy] No rollback image snapshots captured; automatic rollback will be skipped"
+  else
+    chmod 600 "$ROLLBACK_ENV_FILE"
+    echo "[deploy] Rollback image map saved to $ROLLBACK_ENV_FILE"
+  fi
+}
+
+print_stack_debug() {
+  echo "[deploy] Stack status"
+  $DOCKER compose -f "$COMPOSE_FILE" --env-file .env ps || true
+
+  echo "[deploy] Recent service logs"
+  for service in gateway catalogue-service auction-service wallet-service; do
+    echo "[deploy] --- logs: $service ---"
+    $DOCKER compose -f "$COMPOSE_FILE" --env-file .env logs --tail=80 "$service" || true
+  done
+}
+
+automatic_rollback() {
+  local reason="$1"
+  echo "[deploy] Deployment validation failed: $reason"
+  print_stack_debug
+
+  if [[ ! -f "$ROLLBACK_ENV_FILE" ]]; then
+    echo "[deploy] Automatic rollback skipped: no rollback image map was captured"
+    echo "[deploy] Full deploy log: $DEPLOY_LOG"
+    return 1
+  fi
+
+  echo "[deploy] Starting automatic rollback using previous image snapshots"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ROLLBACK_ENV_FILE"
+  set +a
+
+  $DOCKER compose \
+    -f "$COMPOSE_FILE" \
+    --env-file .env \
+    up -d --no-build --force-recreate --remove-orphans
+
+  echo "[deploy] Waiting after rollback (30s)"
+  sleep 30
+  print_stack_debug
+  echo "[deploy] Automatic rollback finished"
+  echo "[deploy] Full deploy log: $DEPLOY_LOG"
+  return 1
+}
+
+wait_for_service_state() {
+  local service="$1"
+  local max_seconds="$2"
+  local allow_running="${3:-false}"
+  local deadline cid state
+  deadline=$((SECONDS + max_seconds))
+
+  while (( SECONDS < deadline )); do
+    cid="$($DOCKER compose -f "$COMPOSE_FILE" --env-file .env ps -q "$service" || true)"
+    if [[ -n "$cid" ]]; then
+      state="$($DOCKER inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid" 2>/dev/null || echo unknown)"
+      if [[ "$state" == "healthy" || ( "$allow_running" == "true" && "$state" == "running" ) ]]; then
+        echo "[deploy] $service state: $state"
+        return 0
+      fi
+      echo "[deploy] $service state: $state"
+    else
+      echo "[deploy] $service container not found yet"
+    fi
+    sleep 5
+  done
+
+  return 1
+}
+
+run_spec_regression() {
+  if [[ "${BIDMART_DEPLOY_RUN_SPEC_REGRESSION:-1}" != "1" ]]; then
+    echo "[deploy] Spec regression skipped by BIDMART_DEPLOY_RUN_SPEC_REGRESSION"
+    return 0
+  fi
+
+  if ! command -v node >/dev/null 2>&1; then
+    echo "[deploy] Node.js is required for scripts/spec-regression.mjs"
+    return 1
+  fi
+
+  local default_gateway_port gateway_url frontend_url run_id
+  if [[ "$ENVIRONMENT" == "prod" ]]; then
+    default_gateway_port="127.0.0.1:28000"
+  else
+    default_gateway_port="127.0.0.1:18000"
+  fi
+
+  gateway_url="${BIDMART_GATEWAY_URL:-http://${GATEWAY_PORT:-$default_gateway_port}}"
+  frontend_url="${BIDMART_FRONTEND_URL:-${FRONTEND_BASE_URL:-${BIDMART_PUBLIC_HOST:-}}}"
+  run_id="${BIDMART_E2E_RUN_ID:-${ENVIRONMENT}-${DEPLOY_TS}}"
+
+  echo "[deploy] Running full synthetic spec regression against $gateway_url"
+  BIDMART_GATEWAY_URL="$gateway_url" \
+    BIDMART_FRONTEND_URL="$frontend_url" \
+    BIDMART_E2E_ENV="$ENVIRONMENT" \
+    BIDMART_E2E_RUN_ID="$run_id" \
+    BIDMART_E2E_INTERNAL_TOKEN="${BIDMART_E2E_INTERNAL_TOKEN:-${GATEWAY_INTERNAL_TOKEN:-}}" \
+    node scripts/spec-regression.mjs --scope full
+}
+
+capture_rollback_images
+
 echo "[deploy] Bringing up $ENVIRONMENT stack with $COMPOSE_FILE"
-$DOCKER compose \
+if ! $DOCKER compose \
   -f "$COMPOSE_FILE" \
   --env-file .env \
-  up -d --build --remove-orphans --pull always
+  up -d --build --remove-orphans --pull always; then
+  automatic_rollback "docker compose up failed"
+fi
 
 echo "[deploy] Waiting for catalogue-service to become healthy (max 180s)"
-deadline=$((SECONDS + 180))
 project_name="${COMPOSE_PROJECT_NAME:-bidmart-${ENVIRONMENT}}"
-catalogue_cid=""
-while (( SECONDS < deadline )); do
-  catalogue_cid="$($DOCKER compose -f "$COMPOSE_FILE" --env-file .env ps -q catalogue-service || true)"
-  if [[ -n "$catalogue_cid" ]]; then
-    state="$($DOCKER inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$catalogue_cid" 2>/dev/null || echo unknown)"
-    if [[ "$state" == "healthy" || "$state" == "running" ]]; then
-      echo "[deploy] catalogue-service state: $state"
-      break
-    fi
-  fi
-  sleep 5
-done
+if ! wait_for_service_state catalogue-service 180 true; then
+  automatic_rollback "catalogue-service did not become healthy"
+fi
+
+echo "[deploy] Waiting for gateway to become healthy (max 120s)"
+if ! wait_for_service_state gateway 120 true; then
+  automatic_rollback "gateway did not become healthy"
+fi
+
+echo "[deploy] Waiting for auction-service to be running (max 120s)"
+if ! wait_for_service_state auction-service 120 true; then
+  automatic_rollback "auction-service did not start"
+fi
+
+echo "[deploy] Waiting for wallet-service to be running (max 120s)"
+if ! wait_for_service_state wallet-service 120 true; then
+  automatic_rollback "wallet-service did not start"
+fi
 
 echo "[deploy] Running gRPC privacy checks"
-COMPOSE_FILE="$COMPOSE_FILE" ./scripts/verify-grpc-private.sh || {
-  echo "[deploy] verify-grpc-private.sh failed; continuing to monitoring check" >&2
-}
+if ! COMPOSE_FILE="$COMPOSE_FILE" ./scripts/verify-grpc-private.sh; then
+  automatic_rollback "verify-grpc-private.sh failed"
+fi
+
 if [[ "$ENVIRONMENT" != "prod" ]]; then
   echo "[deploy] Running monitoring smoke tests (staging only)"
-  USE_DOCKER=true ./scripts/verify-monitoring.sh || {
-    echo "[deploy] verify-monitoring.sh failed; non-fatal in staging" >&2
-  }
+  if ! USE_DOCKER=true ./scripts/verify-monitoring.sh; then
+    automatic_rollback "verify-monitoring.sh failed"
+  fi
 fi
+
+if ! run_spec_regression; then
+  automatic_rollback "scripts/spec-regression.mjs failed"
+fi
+
+echo "[deploy] Deployment validation passed"
+echo "[deploy] Full deploy log: $DEPLOY_LOG"
 REMOTE_SCRIPT
 
 scp $SSH_OPTS "$remote_script" "${SSH_TARGET}:/tmp/bidmart-vps-deploy.sh"
