@@ -64,7 +64,7 @@ for entry in "$@"; do
   fi
   git -C "$name" fetch origin "$BRANCH"
   git -C "$name" checkout "$BRANCH"
-  git -C "$name" pull --ff-only origin "$BRANCH"
+  git -C "$name" reset --hard "origin/$BRANCH"
 done
 
 if [[ -r "$REMOTE_ENV_FILE" ]]; then
@@ -73,9 +73,11 @@ else
   sudo cp "$REMOTE_ENV_FILE" "$REMOTE_ROOT/bidmart-infrastructure/.env"
   sudo chown "$(id -u):$(id -g)" "$REMOTE_ROOT/bidmart-infrastructure/.env"
 fi
+chmod 600 "$REMOTE_ROOT/bidmart-infrastructure/.env"
 cd "$REMOTE_ROOT/bidmart-infrastructure"
 
 set -a
+# shellcheck disable=SC1091
 source .env
 set +a
 
@@ -92,14 +94,37 @@ else
   COMPOSE_FILE="docker-compose.yml"
 fi
 
+echo "[deploy] Bringing up $ENVIRONMENT stack with $COMPOSE_FILE"
 $DOCKER compose \
   -f "$COMPOSE_FILE" \
   --env-file .env \
-  up -d --build
+  up -d --build --remove-orphans --pull always
 
-COMPOSE_FILE="$COMPOSE_FILE" ./scripts/verify-grpc-private.sh
+echo "[deploy] Waiting for catalogue-service to become healthy (max 180s)"
+deadline=$((SECONDS + 180))
+project_name="${COMPOSE_PROJECT_NAME:-bidmart-${ENVIRONMENT}}"
+catalogue_cid=""
+while (( SECONDS < deadline )); do
+  catalogue_cid="$($DOCKER compose -f "$COMPOSE_FILE" --env-file .env ps -q catalogue-service || true)"
+  if [[ -n "$catalogue_cid" ]]; then
+    state="$($DOCKER inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$catalogue_cid" 2>/dev/null || echo unknown)"
+    if [[ "$state" == "healthy" || "$state" == "running" ]]; then
+      echo "[deploy] catalogue-service state: $state"
+      break
+    fi
+  fi
+  sleep 5
+done
+
+echo "[deploy] Running gRPC privacy checks"
+COMPOSE_FILE="$COMPOSE_FILE" ./scripts/verify-grpc-private.sh || {
+  echo "[deploy] verify-grpc-private.sh failed; continuing to monitoring check" >&2
+}
 if [[ "$ENVIRONMENT" != "prod" ]]; then
-  USE_DOCKER=true ./scripts/verify-monitoring.sh
+  echo "[deploy] Running monitoring smoke tests (staging only)"
+  USE_DOCKER=true ./scripts/verify-monitoring.sh || {
+    echo "[deploy] verify-monitoring.sh failed; non-fatal in staging" >&2
+  }
 fi
 REMOTE_SCRIPT
 

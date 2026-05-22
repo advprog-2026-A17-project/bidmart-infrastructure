@@ -49,6 +49,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${CATALOGUE_DB_PASSWORD:-${JDBC_DATABASE_PASSWORD:-}}
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${CATALOGUE_DDL_AUTO:-update}
       BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
+      SPRING_RABBITMQ_ADDRESSES: ${SPRING_RABBITMQ_URL:-${RABBITMQ_URL:-}}
+      BIDMART_JWT_SECRET: ${AUTH_JWT_SECRET:-}
+      GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health >/dev/null 2>&1 || exit 1"]
       interval: 10s
@@ -73,6 +77,7 @@ services:
       CATALOGUE_GRPC_URL: http://catalogue-service:9091
       WALLET_SERVICE_URL: http://wallet-service:8083
       WALLET_GRPC_URL: http://wallet-service:50051
+      RABBITMQ_URL: ${RABBITMQ_URL:-}
       BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
       GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-}
     depends_on:
@@ -94,6 +99,7 @@ services:
         required: false
     environment:
       DATABASE_URL: ${WALLET_DATABASE_URL:-${DATABASE_URL:-}}
+      RABBITMQ_URL: ${RABBITMQ_URL:-}
       BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
       GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-}
       MIDTRANS_SANDBOX_BASE_URL: ${MIDTRANS_SANDBOX_BASE_URL:-https://api.sandbox.midtrans.com}
