@@ -1,4 +1,4 @@
-name: Deploy production VPS
+name: Deploy staging VPS
 
 on:
   push:
@@ -8,16 +8,16 @@ on:
       - 'deploy/**'
       - 'docker-compose.yml'
       - 'scripts/**'
-      - '.github/workflows/deploy-prod-vps.yml'
+      - '.github/workflows/deploy-staging-vps.yml'
   workflow_dispatch:
 
 concurrency:
-  group: bidmart-prod-vps
+  group: bidmart-staging-vps
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy gRPC services to VPS
+    name: Deploy VPS staging stack
     runs-on: ubuntu-latest
     if: github.repository == 'advprog-2026-A17-project/bidmart-infrastructure'
     steps:
@@ -48,13 +48,13 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Deploy production
+      - name: Deploy staging
         env:
           BIDMART_SSH: bidmart
           BIDMART_BRANCH: staging
-        run: deploy/vps/deploy.sh prod
+        run: deploy/vps/deploy.sh staging
 
       - name: Deploy edge proxy
         env:
           BIDMART_SSH: bidmart
-        run: deploy/vps/deploy-edge.sh prod
+        run: deploy/vps/deploy-edge.sh
