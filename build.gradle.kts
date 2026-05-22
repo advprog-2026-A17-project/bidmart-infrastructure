@@ -77,7 +77,7 @@ tasks.check {
 
 sonar {
     properties {
-        property("sonar.projectKey", "advprog-2026-A17-project_bidmart-infrastructure")
+        property("sonar.projectKey", "advprog-2026-A17-project_bidmart-infrastructure2")
         property("sonar.organization", "advprog-2026-a17-project")
         property("sonar.projectName", "bidmart-infrastructure")
         property("sonar.host.url", "https://sonarcloud.io")

@@ -76,4 +76,4 @@ jobs:
             echo "::error::SonarCloud scan failed (exit ${sonar_status})."
             exit "${sonar_status}"
           fi
-          echo "SonarCloud analysis uploaded: https://sonarcloud.io/project/overview?id=advprog-2026-A17-project_bidmart-infrastructure"
+          echo "SonarCloud analysis uploaded: https://sonarcloud.io/project/overview?id=advprog-2026-A17-project_bidmart-infrastructure2"
