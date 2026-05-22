@@ -1,20 +1,10 @@
 name: Deploy production VPS
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'deploy/**'
-      - 'docker-compose.yml'
-      - 'monitoring/**'
-      - 'scripts/**'
-      - 'src/**'
-      - 'Dockerfile'
-      - 'build.gradle.kts'
-      - 'settings.gradle.kts'
-      - 'heroku.yml'
-      - '.github/workflows/deploy-prod-vps.yml'
+  workflow_run:
+    workflows: ["Continuous Integration"]
+    branches: [main]
+    types: [completed]
   workflow_dispatch:
     inputs:
       branch:
@@ -32,21 +22,19 @@ jobs:
   deploy:
     name: Deploy VPS production stack
     runs-on: ubuntu-latest
-    if: github.repository == 'advprog-2026-A17-project/bidmart-infrastructure'
+    if: github.repository == 'advprog-2026-A17-project/bidmart-infrastructure' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     environment:
       name: production
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Resolve branch
         id: resolve
         env:
           INPUT_BRANCH: ${{ github.event.inputs.branch }}
           CLIENT_BRANCH: ${{ github.event.client_payload.branch }}
+          WORKFLOW_RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            branch=main
+          if [ "${{ github.event_name }}" = "workflow_run" ] && [ -n "$WORKFLOW_RUN_BRANCH" ]; then
+            branch="$WORKFLOW_RUN_BRANCH"
           elif [ -n "$INPUT_BRANCH" ]; then
             branch="$INPUT_BRANCH"
           elif [ -n "$CLIENT_BRANCH" ]; then
@@ -56,6 +44,16 @@ jobs:
           fi
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "Deploying VPS prod from branch: $branch"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.branch }}
+
+      - name: Set up Node.js for regression
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Configure SSH alias
         env:
@@ -127,3 +125,15 @@ jobs:
           done
           echo "::error::Production public edge never became healthy"
           exit 1
+
+      - name: Run full synthetic regression through production edge
+        env:
+          BIDMART_GATEWAY_URL: ${{ vars.BIDMART_PROD_GATEWAY_URL || 'https://bidmart-prod.43.157.208.68.sslip.io:8443' }}
+          BIDMART_FRONTEND_URL: ${{ vars.BIDMART_PROD_FRONTEND_URL || 'https://bidmart-frontend.vercel.app' }}
+          BIDMART_E2E_ENV: prod
+          BIDMART_E2E_ALLOW_PROD_SYNTHETIC: "1"
+          BIDMART_E2E_ADMIN_EMAIL: ${{ secrets.BIDMART_E2E_ADMIN_EMAIL }}
+          BIDMART_E2E_ADMIN_PASSWORD: ${{ secrets.BIDMART_E2E_ADMIN_PASSWORD }}
+          BIDMART_E2E_INTERNAL_TOKEN: ${{ secrets.BIDMART_E2E_INTERNAL_TOKEN || secrets.GATEWAY_INTERNAL_TOKEN }}
+          BIDMART_E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: node scripts/spec-regression.mjs --scope full
