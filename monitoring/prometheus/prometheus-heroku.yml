@@ -1,0 +1,55 @@
+# Prometheus scrape config for production (Heroku public URLs).
+# Grafana Cloud Hosted Collector: use the same METRICS_BASIC_USER / METRICS_BASIC_PASSWORD
+# in each scrape job (HTTP Basic). Endpoints return 401 without credentials when env vars are set.
+#
+# Alloy / self-hosted Prometheus example per job:
+#   basic_auth:
+#     username: grafana
+#     password: <METRICS_BASIC_PASSWORD>
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: bidmart-gateway
+    scheme: https
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - bidmart-infrastructure-1e27e116dbce.herokuapp.com:443
+
+  - job_name: bidmart-auth-service
+    scheme: https
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - bidmart-authentication-service-5f40f293e67d.herokuapp.com:443
+
+  - job_name: bidmart-catalogue-service
+    scheme: https
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - bidmart-catalogue-55e10efd36d3.herokuapp.com:443
+
+  - job_name: bidmart-auction-service
+    scheme: https
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - bidmart-auction-service-c30c7668b800.herokuapp.com:443
+
+  - job_name: bidmart-wallet-service
+    scheme: https
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - bidmart-wallet-service-rust-6b50e04f8883.herokuapp.com:443
+
+  - job_name: bidmart-order-service
+    scheme: https
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - bidmart-order-and-notification-f03e03953732.herokuapp.com:443

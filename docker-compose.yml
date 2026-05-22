@@ -5,6 +5,8 @@ name: ${COMPOSE_PROJECT_NAME:-bidmart}
 # of truth.
 x-env-files:
   gateway: &gateway-env-files
+    - path: ../bidmart-frontend/.env
+      required: false
     - path: .env
       required: false
   auth: &auth-env-files
@@ -32,11 +34,6 @@ x-env-files:
       required: false
     - path: .env
       required: false
-  frontend: &frontend-env-files
-    - path: ../bidmart-frontend/.env
-      required: false
-    - path: .env
-      required: false
 
 services:
   gateway:
@@ -48,25 +45,49 @@ services:
     env_file: *gateway-env-files
     environment:
       PORT: 8000
-      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:8080}
-      CATALOGUE_SERVICE_URL: ${CATALOGUE_SERVICE_URL:-http://catalogue-service:8081}
-      AUCTION_SERVICE_URL: ${AUCTION_SERVICE_URL:-http://auction-service:8082}
-      WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
-      ORDER_SERVICE_URL: ${ORDER_SERVICE_URL:-http://order-notification-service:8084}
+      GATEWAY_AUTH_WS_SERVICE_URL: ${GATEWAY_AUTH_WS_SERVICE_URL:-lb://auth-service}
+      GATEWAY_ORDER_WS_SERVICE_URL: ${GATEWAY_ORDER_WS_SERVICE_URL:-lb://order-notification-service}
+      GATEWAY_AUTH_SERVICE_URL: ${GATEWAY_AUTH_SERVICE_URL:-lb://auth-service}
+      GATEWAY_CATALOGUE_SERVICE_URL: ${GATEWAY_CATALOGUE_SERVICE_URL:-lb://catalogue-service}
+      GATEWAY_AUCTION_SERVICE_URL: ${GATEWAY_AUCTION_SERVICE_URL:-lb://auction-service}
+      GATEWAY_WALLET_SERVICE_URL: ${GATEWAY_WALLET_SERVICE_URL:-lb://wallet-service}
+      GATEWAY_ORDER_SERVICE_URL: ${GATEWAY_ORDER_SERVICE_URL:-lb://order-notification-service}
     depends_on:
-      - auth-service
-      - catalogue-service
-      - auction-service
-      - wallet-service
-      - order-notification-service
+      auth-service:
+        condition: service_healthy
+      catalogue-service:
+        condition: service_healthy
+      auction-service:
+        condition: service_started
+      wallet-service:
+        condition: service_started
+      order-notification-service:
+        condition: service_started
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    ports:
+      - "${SWAGGER_UI_PORT:-8088}:8080"
+    environment:
+      SWAGGER_JSON: /usr/share/nginx/html/swagger/openapi-index.yaml
+    volumes:
+      - ../openapi-index.yaml:/usr/share/nginx/html/swagger/openapi-index.yaml:ro
+      - ../bidmart-auth-service/docs:/usr/share/nginx/html/swagger/bidmart-auth-service/docs:ro
+      - ../bidmart-catalogue-service/docs:/usr/share/nginx/html/swagger/bidmart-catalogue-service/docs:ro
+      - ../bidmart-auction-service-rust/docs:/usr/share/nginx/html/swagger/bidmart-auction-service-rust/docs:ro
+      - ../bidmart-wallet-service-rust/docs:/usr/share/nginx/html/swagger/bidmart-wallet-service-rust/docs:ro
+      - ../bidmart-order-and-notification-service/docs:/usr/share/nginx/html/swagger/bidmart-order-and-notification-service/docs:ro
+    depends_on:
+      - gateway
     restart: ${RESTART_POLICY:-unless-stopped}
 
   auth-service:
     image: ${AUTH_IMAGE:-bidmart-auth-service:local}
     build:
       context: ../bidmart-auth-service
-    ports:
-      - "${AUTH_PORT:-8080}:8080"
+    expose:
+      - "8080"
     env_file: *auth-env-files
     environment:
       SPRING_DATASOURCE_URL: ${AUTH_DATABASE_URL:-jdbc:postgresql://auth-db:5432/bidmart_auth}
@@ -74,6 +95,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${AUTH_DB_PASSWORD:-postgres}
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${AUTH_DDL_AUTO:-update}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-bidmart-auth-secret-key-bidmart-auth-secret-key}
+      AUTH_MAX_CONCURRENT_SESSIONS: ${AUTH_MAX_CONCURRENT_SESSIONS:-5}
+      AUTH_SESSION_LIMIT_POLICY: ${AUTH_SESSION_LIMIT_POLICY:-REVOKE_OLDEST}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
@@ -82,7 +105,11 @@ services:
       SPRING_RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
-      AUTH_WALLET_PROVISIONING_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
+      AUTH_WALLET_PROVISIONING_EXCHANGE: ${AUTH_WALLET_PROVISIONING_EXCHANGE:-bidmart.wallet.provisioning}
+      AUTH_INTERNAL_SERVICE_TOKEN: ${AUTH_INTERNAL_SERVICE_TOKEN:-bidmart-local-internal-token}
+      AUTH_PASSWORD_RESET_BASE_URL: ${AUTH_PASSWORD_RESET_BASE_URL:-http://localhost:5173/reset-password}
+      AUTH_AUDIT_EXCHANGE: ${AUTH_AUDIT_EXCHANGE:-bidmart.auth.events}
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
     depends_on:
       auth-db:
         condition: service_healthy
@@ -90,14 +117,21 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 15s
+      retries: 12
+      start_period: 60s
     restart: ${RESTART_POLICY:-unless-stopped}
 
   catalogue-service:
     image: ${CATALOGUE_IMAGE:-bidmart-catalogue-service:local}
     build:
       context: ../bidmart-catalogue-service
-    ports:
-      - "${CATALOGUE_PORT:-8081}:8081"
+    expose:
+      - "8081"
+      - "9091"
     env_file: *catalogue-env-files
     environment:
       SPRING_DATASOURCE_URL: ${CATALOGUE_DATABASE_URL:-jdbc:postgresql://catalogue-db:5432/bidmart_catalogue}
@@ -114,20 +148,28 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
     restart: ${RESTART_POLICY:-unless-stopped}
 
   auction-service:
     image: ${AUCTION_IMAGE:-bidmart-auction-service-rust:local}
     build:
       context: ../bidmart-auction-service-rust
-    ports:
-      - "${AUCTION_PORT:-8082}:8082"
+    expose:
+      - "8082"
     env_file: *auction-env-files
     environment:
       BIND_ADDRESS: 0.0.0.0:8082
       DATABASE_URL: ${AUCTION_DATABASE_URL:-postgresql://postgres:postgres@auction-db:5432/bidmart_auction}
       CATALOGUE_SERVICE_URL: ${CATALOGUE_SERVICE_URL:-http://catalogue-service:8081}
+      CATALOGUE_GRPC_URL: ${CATALOGUE_GRPC_URL:-http://catalogue-service:9091}
       WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
+      WALLET_GRPC_URL: ${WALLET_GRPC_URL:-http://wallet-service:50051}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/%2f}
       BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
       GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
@@ -135,7 +177,7 @@ services:
       - auction-rust-data:/data
     depends_on:
       catalogue-service:
-        condition: service_started
+        condition: service_healthy
       wallet-service:
         condition: service_started
       auction-db:
@@ -148,8 +190,9 @@ services:
     image: ${WALLET_IMAGE:-bidmart-wallet-service-rust:local}
     build:
       context: ../bidmart-wallet-service-rust
-    ports:
-      - "${WALLET_PORT:-8083}:8083"
+    expose:
+      - "8083"
+      - "50051"
     env_file: *wallet-env-files
     environment:
       DATABASE_URL: ${WALLET_DATABASE_URL:-postgresql://postgres:postgres@wallet-db:5432/bidmart_wallet_db}
@@ -170,8 +213,10 @@ services:
       MIDTRANS_IRIS_BASE_URL: ${MIDTRANS_IRIS_BASE_URL:-https://app.sandbox.midtrans.com/iris/api/v1}
       MIDTRANS_IRIS_API_KEY: ${MIDTRANS_IRIS_API_KEY:-IRIS-api-key-local}
       MIDTRANS_IRIS_MERCHANT_KEY: ${MIDTRANS_IRIS_MERCHANT_KEY:-IRIS-merchant-key-local}
-      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost}
-      AUCTION_SERVICE_BASE_URL: ${WALLET_AUCTION_SERVICE_BASE_URL:-http://auction-service:8082/api/v1/auctions}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
+      PORT: 8083
+      GRPC_PORT: 50051
+      AUCTION_SERVICE_BASE_URL: ${WALLET_AUCTION_SERVICE_BASE_URL:-http://auction-service:8082/api/v1/listings}
     volumes:
       - wallet-rust-data:/data
     depends_on:
@@ -185,8 +230,8 @@ services:
     image: ${ORDER_IMAGE:-bidmart-order-and-notification-service:local}
     build:
       context: ../bidmart-order-and-notification-service
-    ports:
-      - "${ORDER_PORT:-8084}:8084"
+    expose:
+      - "8084"
     env_file: *order-env-files
     environment:
       SERVER_PORT: 8084
@@ -199,28 +244,64 @@ services:
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
       BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
+      AUTH_AUDIT_EXCHANGE: ${AUTH_AUDIT_EXCHANGE:-bidmart.auth.events}
+      ORDER_AUTH_EVENTS_QUEUE: ${ORDER_AUTH_EVENTS_QUEUE:-order-notification.auth-events}
       APP_INTERNAL_SERVICE_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
+      GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-bidmart-local-internal-token}
+      WALLET_SERVICE_URL: ${WALLET_SERVICE_URL:-http://wallet-service:8083}
+      BIDMART_AUTH_BASE_URL: ${BIDMART_AUTH_BASE_URL:-http://auth-service:8080}
+      BIDMART_AUTH_INTERNAL_SERVICE_TOKEN: ${AUTH_INTERNAL_SERVICE_TOKEN:-bidmart-local-internal-token}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-bidmart-auth-secret-key-bidmart-auth-secret-key}
+      SPRING_PROFILES_ACTIVE: ${ORDER_SPRING_PROFILES_ACTIVE:-local}
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
     depends_on:
       order-db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 15s
+      retries: 12
+      start_period: 60s
     restart: ${RESTART_POLICY:-unless-stopped}
 
-  frontend:
-    image: ${FRONTEND_IMAGE:-bidmart-frontend:local}
-    build:
-      context: ../bidmart-frontend
-      args:
-        VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-}
-        VITE_GOOGLE_CLIENT_ID: ${OAUTH_GOOGLE_CLIENT_ID:-}
-    env_file: *frontend-env-files
-    environment:
-      PORT: 80
+  prometheus:
+    image: prom/prometheus:v3.1.0
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
     depends_on:
       - gateway
+      - auth-service
+      - catalogue-service
+      - auction-service
+      - wallet-service
+      - order-notification-service
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
     restart: ${RESTART_POLICY:-unless-stopped}
 
   auth-db:
@@ -316,8 +397,8 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+      - "${RABBITMQ_HOST_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_HOST_PORT:-15672}:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
@@ -331,7 +412,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_HOST_PORT:-6379}:6379"
     command:
       - redis-server
       - --appendonly
@@ -345,6 +426,7 @@ services:
       retries: 5
     restart: ${RESTART_POLICY:-unless-stopped}
 
+
 volumes:
   auth-db-data:
   auction-db-data:
@@ -354,3 +436,6 @@ volumes:
   wallet-db-data:
   wallet-rust-data:
   redis-data:
+  rabbitmq-data:
+  prometheus-data:
+  grafana-data:

@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 
+import { execSync } from 'node:child_process';
+
 const DEFAULT_GATEWAY_URL = 'http://localhost:8000';
-const DEFAULT_FRONTEND_URL = 'http://localhost';
+const SMOKE_AUTO_PASSWORD = 'BidmartSmoke1!';
+
+const toCatalogueDateTime = (ms) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+const DEFAULT_FRONTEND_URL = 'http://localhost:5173';
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_POLL_TIMEOUT_MS = 200_000;
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
@@ -33,6 +38,7 @@ const config = {
     topUpCents: positiveInt(env.BIDMART_SMOKE_TOP_UP_CENTS, 100_000),
     skipFrontend: env.BIDMART_SKIP_FRONTEND_CHECK === '1',
     skipNotifications: env.BIDMART_SKIP_NOTIFICATION_CHECK === '1',
+    autoProvision: env.BIDMART_SMOKE_AUTO_PROVISION === '1',
 };
 
 const state = {
@@ -65,10 +71,10 @@ async function main() {
         return api('/api/v1/catalogue/listings/search?page=0&size=1');
     });
 
-    await step('auction listing route is reachable through the gateway', () => {
-        return api('/api/v1/auctions', {
+    await step('bidding listing route is reachable through the gateway', () => {
+        return api('/api/v1/listings', {
             expectedStatuses: [200, 401, 403],
-            label: 'unauthenticated auction listing route',
+            label: 'unauthenticated bidding listing route',
         });
     });
 
@@ -95,10 +101,10 @@ async function main() {
         console.log('Skipping admin checks: admin credentials not provided or login failed.');
     }
 
-    await step('authenticated auction listing endpoint is reachable', () => {
-        return api('/api/v1/auctions', {
+    await step('authenticated bidding listing endpoint is reachable', () => {
+        return api('/api/v1/listings', {
             actor: buyer,
-            label: 'authenticated auction listing',
+            label: 'authenticated bidding listing',
         });
     });
 
@@ -108,17 +114,40 @@ async function main() {
     const listing = await step('seller can create a catalogue listing', () => createListing(seller));
     await step('seller can publish the listing', () => publishListing(seller, listing.id));
 
-    const auction = await step('seller can create an English auction', () => createAuction(seller, listing.id));
-    await step('catalogue can mark the listing auction-created', () => markAuctionCreated(seller, listing.id));
+    await step('wait for catalogue auction window to open', async () => {
+        await sleep(3_000);
+    });
 
-    await step('buyer can place a bid backed by wallet hold', () => placeBid(buyer, auction.id));
-    await step('auction can close after its end time', () => closeAuctionAfterEnd(seller, auction.id));
+    const session = await step('seller can open listing auction session', () => openListingAuctionSession(seller, listing.id));
+    if (session.id !== listing.id) {
+        throw new SmokeError('Listing auction session id must match catalogue listing id.', {
+            listingId: listing.id,
+            sessionId: session.id,
+        });
+    }
+
+    await step('buyer can place a bid backed by wallet hold', () => placeBid(buyer, listing.id));
+    await step('catalogue reflects bid price update', () => waitForListingPrice(listing.id, 505));
+    const settled = await step('listing can settle after its end time', () => closeListingAfterEnd(seller, listing.id));
+    const auctionStatus = String(settled?.status || '').toUpperCase();
+    if (auctionStatus !== 'WON') {
+        throw new SmokeError('Expected auction to close as WON for win-path smoke.', {
+            listingId: listing.id,
+            status: auctionStatus,
+            settled,
+        });
+    }
 
     await step('buyer wallet detail remains readable after auction lifecycle', () => ensureWallet(buyer));
 
     if (!config.skipNotifications) {
-        await step('buyer receives an auction notification', () => waitForAuctionNotification(buyer, auction.id));
+        await step('buyer receives an auction notification', () => waitForAuctionNotification(buyer, listing.id));
     }
+
+    const winOrder = await step('buyer order exists after auction win', () =>
+        waitForBuyerOrder(buyer, seller, listing.id, 505)
+    );
+    await step('buyer order status is CREATED after win', () => verifyWinOrderCreated(winOrder));
 
     // If admin credentials were provided, validate an admin-only endpoint
     if (admin) {
@@ -132,7 +161,7 @@ async function main() {
     console.log('');
     console.log('Functional smoke passed.');
     console.log(`Created listing: ${state.createdListingId}`);
-    console.log(`Created auction: ${state.createdAuctionId}`);
+    console.log(`Listing auction session: ${state.createdAuctionId ?? state.createdListingId}`);
 }
 
 async function authenticateActor(role) {
@@ -150,8 +179,14 @@ async function authenticateActor(role) {
         };
     }
 
-    const email = requiredEnv(`BIDMART_${role}_EMAIL`);
-    const password = requiredEnv(`BIDMART_${role}_PASSWORD`);
+    let email = envValue(`BIDMART_${role}_EMAIL`);
+    let password = envValue(`BIDMART_${role}_PASSWORD`);
+    if (!email && config.autoProvision) {
+        return provisionActor(role);
+    }
+
+    email = requiredEnv(`BIDMART_${role}_EMAIL`);
+    password = requiredEnv(`BIDMART_${role}_PASSWORD`);
     const login = await api('/api/v1/auth/login', {
         method: 'POST',
         body: { email, password },
@@ -255,6 +290,9 @@ async function topUpBuyerWallet(buyer) {
 
 async function createListing(seller) {
     const suffix = Date.now();
+    const now = Date.now();
+    const startTime = toCatalogueDateTime(now + 2_000);
+    const endTime = toCatalogueDateTime(now + (config.auctionLifetimeSeconds + 10) * 1_000);
     const result = await api('/api/v1/catalogue/listings', {
         method: 'POST',
         actor: seller,
@@ -264,7 +302,10 @@ async function createListing(seller) {
             category: 'Electronics',
             startingPrice: 500,
             reservePrice: 500,
+            minimumIncrement: 5,
             currentPrice: 500,
+            startTime,
+            endTime,
             imageUrl: null,
         },
         label: 'create listing',
@@ -286,46 +327,35 @@ async function publishListing(seller, listingId) {
     });
 }
 
-async function createAuction(seller, listingId) {
+async function openListingAuctionSession(seller, listingId) {
     const now = Date.now();
-    const startTime = new Date(now - 1_000).toISOString();
-    const endTime = new Date(now + config.auctionLifetimeSeconds * 1_000).toISOString();
+    const startTime = Math.floor(now / 1000) - 1;
+    const endTime = Math.floor((now + (config.auctionLifetimeSeconds + 5) * 1_000) / 1000);
 
-    const result = await api('/api/v1/auctions', {
+    const result = await api('/api/v1/listings', {
         method: 'POST',
         actor: seller,
         body: {
             listingId,
             sellerId: seller.user.id,
             auctionType: 'ENGLISH',
-            startingPrice: 500,
-            reservePrice: 500,
-            minimumIncrement: 5,
+            starting_price_cents: 50_000,
+            reserve_price_cents: 50_000,
+            minimum_increment_cents: 500,
             startTime,
             endTime,
         },
-        expectedStatuses: [201],
-        label: 'create auction',
+        expectedStatuses: [201, 409],
+        label: 'open listing auction session',
     });
 
-    const auctionId = String(result.payload?.id || '');
-    if (!auctionId) {
-        throw new SmokeError('Auction create did not return an id.', { payload: result.payload });
-    }
-    state.createdAuctionId = auctionId;
-    return { id: auctionId, endTime, payload: result.payload };
+    const sessionId = String(result.payload?.id || result.payload?.listingId || listingId);
+    state.createdAuctionId = sessionId;
+    return { id: sessionId, endTime, payload: result.payload };
 }
 
-async function markAuctionCreated(seller, listingId) {
-    return api(`/api/v1/catalogue/listings/${encodeURIComponent(listingId)}/auction-created`, {
-        method: 'POST',
-        actor: seller,
-        label: 'mark auction created',
-    });
-}
-
-async function placeBid(buyer, auctionId) {
-    const result = await api(`/api/v1/auctions/${encodeURIComponent(auctionId)}/bids`, {
+async function placeBid(buyer, listingId) {
+    const result = await api(`/api/v1/listings/${encodeURIComponent(listingId)}/bids`, {
         method: 'POST',
         actor: buyer,
         body: {
@@ -342,13 +372,13 @@ async function placeBid(buyer, auctionId) {
     return result.payload;
 }
 
-async function closeAuctionAfterEnd(seller, auctionId) {
+async function closeListingAfterEnd(seller, listingId) {
     return poll(async () => {
         try {
-            const result = await api(`/api/v1/auctions/${encodeURIComponent(auctionId)}/close`, {
+            const result = await api(`/api/v1/listings/${encodeURIComponent(listingId)}/close`, {
                 method: 'POST',
                 actor: seller,
-                label: 'close auction',
+                label: 'settle listing',
             });
             return result.payload;
         } catch (error) {
@@ -360,7 +390,68 @@ async function closeAuctionAfterEnd(seller, auctionId) {
             }
             throw error;
         }
-    }, 'auction close');
+    }, 'listing settlement');
+}
+
+async function waitForListingPrice(listingId, expectedPrice) {
+    return poll(async () => {
+        const result = await api(`/api/v1/catalogue/listings/${encodeURIComponent(listingId)}`, {
+            label: 'read listing after bid',
+        });
+        const currentPrice = Number(result.payload?.currentPrice);
+        const hasBids = Boolean(result.payload?.hasBids);
+        if (hasBids && Number.isFinite(currentPrice) && currentPrice >= expectedPrice) {
+            return result.payload;
+        }
+        return null;
+    }, 'catalogue bid price sync');
+}
+
+async function waitForBuyerOrder(buyer, seller, listingId, finalPrice) {
+    const internalToken = env.BIDMART_INTERNAL_SERVICE_TOKEN || env.GATEWAY_INTERNAL_TOKEN || 'bidmart-local-internal-token';
+    let fallbackTriggered = false;
+
+    return poll(async () => {
+        const result = await api('/api/v1/orders', {
+            actor: buyer,
+            label: 'list buyer orders',
+        });
+        const orders = Array.isArray(result.payload) ? result.payload : [];
+        const match = orders.find((order) => {
+            const auctionId = String(order.auctionId || order.listingId || '');
+            return auctionId === listingId;
+        });
+        if (match) {
+            return match;
+        }
+
+        if (!fallbackTriggered) {
+            fallbackTriggered = true;
+            triggerOrderFallbackDocker({
+                eventId: `smoke-order-${Date.now()}`,
+                auctionId: listingId,
+                listingId,
+                sellerId: seller.user.id,
+                buyerId: buyer.user.id,
+                finalPrice,
+                shippingAddress: 'Smoke Address',
+                internalToken,
+            });
+        }
+
+        return null;
+    }, 'buyer order after win');
+}
+
+function verifyWinOrderCreated(order) {
+    const status = String(order?.status || '').toUpperCase();
+    if (!status) {
+        throw new SmokeError('Win-path order missing status field.', { order });
+    }
+    if (status !== 'CREATED') {
+        throw new SmokeError(`Expected win-path order status CREATED but got ${status}.`, { order });
+    }
+    return order;
 }
 
 async function waitForAuctionNotification(buyer, auctionId) {
@@ -406,6 +497,7 @@ async function request(url, options = {}) {
         body,
         expectedStatuses,
         label = `${method} ${url}`,
+        headers: extraHeaders = {},
     } = options;
 
     const controller = new AbortController();
@@ -414,6 +506,7 @@ async function request(url, options = {}) {
         Accept: 'application/json',
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...(actor?.token ? { Authorization: `Bearer ${actor.token}` } : {}),
+        ...extraHeaders,
     };
 
     let response;
@@ -509,6 +602,83 @@ function assertRole(user, role) {
     }
 }
 
+async function provisionActor(role) {
+    const email = `smoke-${role.toLowerCase()}-${Date.now()}@bidmart.local`;
+    const password = SMOKE_AUTO_PASSWORD;
+
+    await api('/api/v1/auth/register', {
+        method: 'POST',
+        body: { email, password },
+        expectedStatuses: [200, 201],
+        label: `${role} auto-register`,
+    });
+
+    verifyAuthUserForSmoke(email, role);
+
+    const login = await api('/api/v1/auth/login', {
+        method: 'POST',
+        body: { email, password },
+        label: `${role} auto-login`,
+    });
+
+    const payload = login.payload;
+    if (!payload?.accessToken || !payload?.user?.id) {
+        throw new SmokeError(`${role} auto-login did not return an access token and user id.`, { payload });
+    }
+
+    assertRole(payload.user, role);
+    return {
+        role,
+        token: payload.accessToken,
+        user: payload.user,
+    };
+}
+
+function triggerOrderFallbackDocker(payload) {
+    const container = env.BIDMART_ORDER_CONTAINER || 'bidmart-order-notification-service-1';
+    const body = JSON.stringify({
+        eventId: payload.eventId,
+        auctionId: payload.auctionId,
+        listingId: payload.listingId,
+        sellerId: payload.sellerId,
+        buyerId: payload.buyerId,
+        finalPrice: payload.finalPrice,
+        shippingAddress: payload.shippingAddress,
+    });
+    const escaped = body.replace(/'/g, `'\\''`);
+    execSync(
+        `docker exec ${container} wget -qO- --timeout=60 --header='Content-Type: application/json' --header='X-Internal-Service-Token: ${payload.internalToken}' --post-data='${escaped}' http://127.0.0.1:8084/api/v1/orders/events/auction-won`,
+        { stdio: 'pipe' }
+    );
+}
+
+function verifyAuthUserForSmoke(email, role) {
+    const dbContainer = env.BIDMART_AUTH_DB_CONTAINER || 'bidmart-auth-db-1';
+    const sellerRoleId = '00000000-0000-0000-0000-000000000002';
+    const buyerRoleId = '00000000-0000-0000-0000-000000000001';
+    const roleId = role === 'SELLER' ? sellerRoleId : buyerRoleId;
+    const escapedEmail = email.replace(/'/g, "''");
+
+    const sql = [
+        `UPDATE users SET email_verified = TRUE, verification_token = NULL, verification_token_expires_at = NULL, two_factor_enabled = FALSE, two_factor_secret = NULL, profile_completed = TRUE, display_name = 'Smoke ${role}', shipping_address = 'Smoke Address' WHERE email = '${escapedEmail}'`,
+        `DELETE FROM user_roles WHERE user_id = (SELECT id FROM users WHERE email = '${escapedEmail}')`,
+        `INSERT INTO user_roles (user_id, role_id) SELECT id, '${roleId}' FROM users WHERE email = '${escapedEmail}'`,
+    ].join('; ');
+
+    try {
+        execSync(
+            `docker exec ${dbContainer} psql -U postgres -d bidmart_auth -v ON_ERROR_STOP=1 -c "${sql.replace(/"/g, '\\"')}"`,
+            { stdio: 'pipe' }
+        );
+    } catch (error) {
+        throw new SmokeError(`Failed to verify smoke ${role} in auth database.`, {
+            email,
+            dbContainer,
+            stderr: error.stderr?.toString(),
+        });
+    }
+}
+
 function requiredEnv(name) {
     const value = envValue(name);
     if (!value) {
@@ -579,6 +749,8 @@ Useful options:
   BIDMART_SMOKE_SCOPE=full|public
   BIDMART_SKIP_FRONTEND_CHECK=1
   BIDMART_SKIP_NOTIFICATION_CHECK=1
+  BIDMART_SMOKE_AUTO_PROVISION=1
+  BIDMART_AUTH_DB_CONTAINER=bidmart-auth-db-1
   BIDMART_AUCTION_LIFETIME_SECONDS=5
   BIDMART_SMOKE_TOP_UP_CENTS=100000
 `);

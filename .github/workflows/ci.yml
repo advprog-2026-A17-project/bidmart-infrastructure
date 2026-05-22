@@ -25,6 +25,15 @@ jobs:
           chmod +x gradlew
           ./gradlew test jacocoTestReport
 
+      - name: Upload Test And Coverage Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infrastructure-test-coverage
+          path: |
+            build/reports/tests/test/**
+            build/reports/jacoco/test/**
+
   sonarcloud:
     name: SonarCloud Code Analysis
     runs-on: ubuntu-latest
@@ -51,4 +60,14 @@ jobs:
             exit 0
           fi
           chmod +x gradlew
-          ./gradlew sonar
+          set +e
+          ./gradlew test jacocoTestReport sonar 2>&1 | tee sonar.log
+          sonar_status=${PIPESTATUS[0]}
+          set -e
+          if [ "${sonar_status}" -ne 0 ]; then
+            if grep -qi "Automatic Analysis is enabled" sonar.log; then
+              echo "SonarCloud Automatic Analysis is enabled; skipping CI sonar scan."
+              exit 0
+            fi
+            exit "${sonar_status}"
+          fi
