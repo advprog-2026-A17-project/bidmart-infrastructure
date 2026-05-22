@@ -5,6 +5,8 @@ name: ${COMPOSE_PROJECT_NAME:-bidmart}
 # of truth.
 x-env-files:
   gateway: &gateway-env-files
+    - path: ../bidmart-frontend/.env
+      required: false
     - path: .env
       required: false
   auth: &auth-env-files

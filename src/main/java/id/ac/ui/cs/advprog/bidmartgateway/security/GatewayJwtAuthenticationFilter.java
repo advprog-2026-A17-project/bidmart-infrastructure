@@ -58,6 +58,10 @@ public class GatewayJwtAuthenticationFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
 
+        if (path.startsWith("/actuator/")) {
+            return chain.filter(stripIdentityHeaders(exchange));
+        }
+
         if (isPublicRoute(request.getMethod(), path)) {
             return chain.filter(stripIdentityHeaders(exchange));
         }
