@@ -35,6 +35,8 @@
 | [13. Desain lintas modul.md](./13.%20Desain%20lintas%20modul.md) |
 | [14. Deployment rollback.md](./14.%20Deployment%20rollback.md) |
 | [15. Deployment.md](./15.%20Deployment.md) |
+| [22. Final audit traceability.md](./22.%20Final%20audit%20traceability.md) |
+| [23. VPS gRPC deployment.md](./23.%20VPS%20gRPC%20deployment.md) |
 | [16. Functional testing.md](./16.%20Functional%20testing.md) |
 | [17. Architecture risk.md](./17.%20Architecture%20risk.md) |
 

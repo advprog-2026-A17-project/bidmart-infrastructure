@@ -1,0 +1,45 @@
+{$BIDMART_PROD_HOST:bidmart-prod.43.157.208.68.sslip.io} {
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	handle_path /swagger/* {
+		reverse_proxy host.docker.internal:28088
+	}
+
+	handle_path /grafana/* {
+		reverse_proxy host.docker.internal:23001
+	}
+
+	handle {
+		reverse_proxy host.docker.internal:28000
+	}
+}
+
+{$BIDMART_STAGING_HOST:bidmart-staging.43.157.208.68.sslip.io} {
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	handle_path /swagger/* {
+		reverse_proxy host.docker.internal:18088
+	}
+
+	handle_path /grafana/* {
+		reverse_proxy host.docker.internal:13001
+	}
+
+	handle {
+		reverse_proxy host.docker.internal:18000
+	}
+}

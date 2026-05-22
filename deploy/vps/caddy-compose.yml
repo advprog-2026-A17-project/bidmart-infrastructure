@@ -1,0 +1,20 @@
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    ports:
+      - "${PUBLIC_HTTP_PORT:-80}:80"
+      - "${PUBLIC_HTTPS_PORT:-443}:443"
+    environment:
+      BIDMART_PROD_HOST: ${BIDMART_PROD_HOST:-bidmart-prod.43.157.208.68.sslip.io}
+      BIDMART_STAGING_HOST: ${BIDMART_STAGING_HOST:-bidmart-staging.43.157.208.68.sslip.io}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:
