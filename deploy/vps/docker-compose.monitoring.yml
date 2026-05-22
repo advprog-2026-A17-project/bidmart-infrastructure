@@ -1,0 +1,59 @@
+name: bidmart-monitoring
+
+# BidMart unified observability agent.
+# Brings up a single Grafana Alloy instance that:
+#   - scrapes Prometheus metrics from Heroku (auth, order) and VPS (gateway, catalogue, auction, wallet)
+#   - tails Docker logs from every VPS container (bidmart-staging-* and bidmart-prod-*)
+#   - remote_writes everything to Grafana Cloud Hosted Prometheus + Loki
+#
+# Deploy alongside the regular staging/prod stacks:
+#   docker compose -f deploy/vps/docker-compose.monitoring.yml --env-file /etc/bidmart/grafana-cloud.env up -d
+#
+# Required env (loaded from /etc/bidmart/grafana-cloud.env):
+#   GRAFANA_CLOUD_PROMETHEUS_URL   e.g. https://prometheus-prod-XX-prod-ap-southeast-1.grafana.net/api/prom/push
+#   GRAFANA_CLOUD_PROMETHEUS_USER  e.g. 1234567 (numeric instance id)
+#   GRAFANA_CLOUD_LOKI_URL         e.g. https://logs-prod-XXX.grafana.net/loki/api/v1/push
+#   GRAFANA_CLOUD_LOKI_USER        e.g. 7654321
+#   GRAFANA_CLOUD_API_KEY          single MetricsPublisher / "All access" token (used as password for both)
+#   METRICS_BASIC_USER             same value baked into Heroku + VPS apps (e.g. grafana)
+#   METRICS_BASIC_PASSWORD         strong password also set on every app
+
+services:
+  alloy:
+    image: grafana/alloy:v1.4.2
+    container_name: bidmart-alloy
+    restart: unless-stopped
+    user: "0:0"
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    environment:
+      GRAFANA_CLOUD_PROMETHEUS_URL: ${GRAFANA_CLOUD_PROMETHEUS_URL}
+      GRAFANA_CLOUD_PROMETHEUS_USER: ${GRAFANA_CLOUD_PROMETHEUS_USER}
+      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL}
+      GRAFANA_CLOUD_LOKI_USER: ${GRAFANA_CLOUD_LOKI_USER}
+      GRAFANA_CLOUD_API_KEY: ${GRAFANA_CLOUD_API_KEY}
+      METRICS_BASIC_USER: ${METRICS_BASIC_USER}
+      METRICS_BASIC_PASSWORD: ${METRICS_BASIC_PASSWORD}
+    volumes:
+      - ../../monitoring/grafana-cloud/alloy.config.river:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy_data:/var/lib/alloy/data
+    ports:
+      - "127.0.0.1:12345:12345"  # Alloy debug UI (loopback only)
+    networks:
+      - bidmart-staging-net
+      - bidmart-prod-net
+
+networks:
+  bidmart-staging-net:
+    name: bidmart-staging_default
+    external: true
+  bidmart-prod-net:
+    name: bidmart-prod_default
+    external: true
+
+volumes:
+  alloy_data:
