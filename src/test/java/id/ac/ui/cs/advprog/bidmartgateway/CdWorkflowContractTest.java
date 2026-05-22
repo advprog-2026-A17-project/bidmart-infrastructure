@@ -16,6 +16,9 @@ class CdWorkflowContractTest {
         String ciWorkflow = ContractFileReader.read(".github/workflows/ci.yml");
 
         assertFalse(Files.exists(cdWorkflow));
-        assertTrue(ciWorkflow.contains("cargo test") || ciWorkflow.contains("gradlew test"));
+        assertTrue(ciWorkflow.contains("gradlew test"));
+        assertTrue(ciWorkflow.contains("sonarcloud:"), "CI must include a SonarCloud job");
+        assertTrue(ciWorkflow.contains("SonarCloud Code Analysis"));
+        assertTrue(ciWorkflow.contains("jacocoTestCoverageVerification"));
     }
 }
