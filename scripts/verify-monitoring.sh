@@ -35,6 +35,13 @@ curl_health() {
   fi
 }
 
+metrics_curl_args() {
+  METRICS_CURL_ARGS=(-sf --max-time 15)
+  if [[ -n "${METRICS_BASIC_USER:-}" && -n "${METRICS_BASIC_PASSWORD:-}" ]]; then
+    METRICS_CURL_ARGS+=(-u "${METRICS_BASIC_USER}:${METRICS_BASIC_PASSWORD}")
+  fi
+}
+
 curl_metrics() {
   local name="$1"
   local base_url="$2"
@@ -45,10 +52,20 @@ curl_metrics() {
   fi
   base_url="${base_url%/}"
   local url="${base_url}${path}"
+  metrics_curl_args
   local body
-  if body="$(curl -sf --max-time 15 "$url" 2>/dev/null)" && [[ -n "$body" ]]; then
+  if body="$(curl "${METRICS_CURL_ARGS[@]}" "$url" 2>/dev/null)" && [[ -n "$body" ]]; then
     if echo "$body" | grep -qE '^# HELP|^# TYPE|^[a-zA-Z_:][a-zA-Z0-9_:]* '; then
       log_ok "$name ($url)"
+      if [[ -n "${METRICS_BASIC_USER:-}" && -n "${METRICS_BASIC_PASSWORD:-}" ]]; then
+        local unauth_code
+        unauth_code="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 15 "$url" 2>/dev/null || echo "000")"
+        if [[ "$unauth_code" == "401" ]]; then
+          log_ok "$name unauthenticated blocked (401)"
+        else
+          log_fail "$name unauthenticated should return 401 (got ${unauth_code})"
+        fi
+      fi
     else
       log_fail "$name ($url — not Prometheus text format)"
     fi

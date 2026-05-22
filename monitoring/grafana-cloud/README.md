@@ -50,15 +50,25 @@ Each check should return HTTP 200 with Prometheus text format.
 
 ## 3. Configure scrape in Grafana Cloud (UI)
 
-Recommended for teams without a separate scraper host:
+Use **Hosted Collector** (Custom setup → scrape public HTTPS endpoints).
 
-1. Grafana Cloud → **Connections** (or **Integrations**).
-2. Add **Prometheus** scraping / **Metrics endpoint** integration.
-3. For each BidMart service, add a scrape target:
+**Prerequisite:** set the same HTTP Basic credentials on every Heroku app (required by Grafana Cloud; dummy credentials are rejected):
+
+```bash
+# Use one strong password; repeat on each app you deploy.
+heroku config:set METRICS_BASIC_USER=grafana METRICS_BASIC_PASSWORD='your-strong-password' -a <app-name>
+```
+
+Apps: `bidmart-infrastructure`, `bidmart-authentication-service`, `bidmart-catalogue`, `bidmart-auction-service`, `bidmart-wallet-service-rust`, `bidmart-order-and-notification`.
+
+After deploy, **Test Connection** in Grafana must succeed with that username/password.
+
+1. Grafana Cloud → **Connections** → **Metrics Endpoint**.
+2. For each service, create a scrape job:
    - **URL:** `https://<app>.herokuapp.com/actuator/prometheus` or `.../metrics` (Rust)
-   - **Interval:** 15s (match local)
-   - **Job label:** use names from `prometheus-heroku.yml` (e.g. `bidmart-auth-service`)
-4. Alternatively, copy job definitions from [prometheus-heroku.yml](../prometheus/prometheus-heroku.yml) into Grafana Cloud’s Prometheus scrape config editor.
+   - **Interval:** 30s (Grafana Cloud minimum on free tier)
+   - **Auth:** Basic — same `METRICS_BASIC_USER` / `METRICS_BASIC_PASSWORD`
+3. Job names: see [prometheus-heroku.yml](../prometheus/prometheus-heroku.yml).
 
 ### Optional: Grafana Alloy agent
 
