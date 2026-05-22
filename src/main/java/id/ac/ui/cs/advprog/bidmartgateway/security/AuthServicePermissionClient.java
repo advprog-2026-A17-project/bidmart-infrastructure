@@ -14,7 +14,7 @@ public class AuthServicePermissionClient implements AuthPermissionClient {
 
     public AuthServicePermissionClient(
             WebClient.Builder webClientBuilder,
-            @Value("${AUTH_SERVICE_URL:http://localhost:8080}") String authServiceUrl
+            @Value("${GATEWAY_AUTH_SERVICE_URL:${AUTH_SERVICE_URL:http://localhost:8080}}") String authServiceUrl
     ) {
         this.webClient = webClientBuilder.baseUrl(authServiceUrl).build();
     }

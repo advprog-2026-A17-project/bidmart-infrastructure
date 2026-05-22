@@ -20,6 +20,9 @@ services:
       GATEWAY_AUTH_WS_SERVICE_URL: ${GATEWAY_AUTH_WS_SERVICE_URL:-https://bidmart-auth-876b62d83c69.herokuapp.com}
       GATEWAY_ORDER_WS_SERVICE_URL: ${GATEWAY_ORDER_WS_SERVICE_URL:-https://bidmart-order-ced842eeb858.herokuapp.com}
       GATEWAY_AUTH_SERVICE_URL: ${GATEWAY_AUTH_SERVICE_URL:-https://bidmart-auth-876b62d83c69.herokuapp.com}
+      AUTH_SERVICE_URL: ${GATEWAY_AUTH_SERVICE_URL:-https://bidmart-auth-876b62d83c69.herokuapp.com}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-}
+      GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-}
       GATEWAY_CATALOGUE_SERVICE_URL: http://catalogue-service:8081
       GATEWAY_AUCTION_SERVICE_URL: http://auction-service:8082
       GATEWAY_WALLET_SERVICE_URL: http://wallet-service:8083
