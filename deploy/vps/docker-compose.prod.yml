@@ -53,6 +53,12 @@ services:
       BIDMART_JWT_SECRET: ${AUTH_JWT_SECRET:-}
       GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      # Supabase Session Pooler caps at 15 connections; we run staging + prod
+      # against the same project, so keep each Hikari pool small.
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${CATALOGUE_HIKARI_MAX:-4}
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: ${CATALOGUE_HIKARI_MIN_IDLE:-1}
+      SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT: ${CATALOGUE_HIKARI_IDLE_TIMEOUT:-30000}
+      SPRING_DATASOURCE_HIKARI_MAX_LIFETIME: ${CATALOGUE_HIKARI_MAX_LIFETIME:-300000}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health >/dev/null 2>&1 || exit 1"]
       interval: 10s
