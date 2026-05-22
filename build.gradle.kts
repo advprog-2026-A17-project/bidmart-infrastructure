@@ -10,7 +10,9 @@ group = "id.ac.ui.cs.advprog"
 version = "0.0.1-SNAPSHOT"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
 repositories {
@@ -80,6 +82,7 @@ sonar {
         property("sonar.projectName", "bidmart-infrastructure")
         property("sonar.host.url", "https://sonarcloud.io")
         property("sonar.gradle.skipCompile", "true")
+        property("sonar.qualitygate.wait", "true")
         property("sonar.newCode.referenceBranch", "main")
         property(
             "sonar.coverage.jacoco.xmlReportPaths",
