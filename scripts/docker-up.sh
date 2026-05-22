@@ -48,6 +48,7 @@ for image in "${BASE_IMAGES[@]}"; do
 done
 
 echo "== Building and starting stack =="
-docker compose -f "${COMPOSE_FILE}" up -d --build "$@"
+COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}" \
+  docker compose -f "${COMPOSE_FILE}" up -d --build "$@"
 
 echo "Done. Gateway: http://localhost:8000"
