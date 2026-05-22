@@ -15,12 +15,11 @@ Scrape **each service directly** (not through the gateway JWT). Job list mirrors
 
 | Job | Metrics path |
 |-----|----------------|
-| `bidmart-gateway` | `/actuator/prometheus` |
-| `bidmart-auth-service` | `/actuator/prometheus` |
-| `bidmart-catalogue-service` | `/actuator/prometheus` |
-| `bidmart-auction-service` | `/metrics` |
-| `bidmart-wallet-service` | `/metrics` |
-| `bidmart-order-service` | `/actuator/prometheus` |
+| `bidmart-gateway-staging` / `bidmart-gateway-prod` | VPS sslip.io `/actuator/prometheus` |
+| `bidmart-auth-staging` / `bidmart-auth` | Heroku `/actuator/prometheus` |
+| `bidmart-order-staging` / `bidmart-order` | Heroku `/actuator/prometheus` |
+
+Catalogue, auction, wallet metrics are exposed via the **VPS gateway** Prometheus aggregate.
 
 ## 1. Create Grafana Cloud stack
 
@@ -36,12 +35,9 @@ Scrape **each service directly** (not through the gateway JWT). Job list mirrors
 From `bidmart-infrastructure`:
 
 ```bash
-export HEROKU_GATEWAY_METRICS_URL=https://<gateway-app>.herokuapp.com
-export HEROKU_AUTH_METRICS_URL=https://bidmart-authentication-service-5f40f293e67d.herokuapp.com
-export HEROKU_CATALOGUE_METRICS_URL=https://<catalogue-app>.herokuapp.com
-export HEROKU_AUCTION_METRICS_URL=https://bidmart-auction-service-c30c7668b800.herokuapp.com
-export HEROKU_WALLET_METRICS_URL=https://<wallet-app>.herokuapp.com
-export HEROKU_ORDER_METRICS_URL=https://<order-app>.herokuapp.com
+export HEROKU_GATEWAY_METRICS_URL=https://bidmart-staging.43.157.208.68.sslip.io
+export HEROKU_AUTH_METRICS_URL=https://bidmart-auth-staging-392ed0eda7b8.herokuapp.com
+export HEROKU_ORDER_METRICS_URL=https://bidmart-order-staging-a5fd01b90144.herokuapp.com
 
 USE_HEROKU_URLS=true ./scripts/verify-monitoring.sh
 ```
@@ -59,7 +55,7 @@ Use **Hosted Collector** (Custom setup → scrape public HTTPS endpoints).
 heroku config:set METRICS_BASIC_USER=grafana METRICS_BASIC_PASSWORD='your-strong-password' -a <app-name>
 ```
 
-Apps: `bidmart-infrastructure`, `bidmart-authentication-service`, `bidmart-catalogue`, `bidmart-auction-service`, `bidmart-wallet-service-rust`, `bidmart-order-and-notification`.
+Set `METRICS_BASIC_*` on Heroku auth/order apps and on VPS `/etc/bidmart/*.env` (gateway). See [SCRAPE_TARGETS.md](./SCRAPE_TARGETS.md).
 
 After deploy, **Test Connection** in Grafana must succeed with that username/password.
 

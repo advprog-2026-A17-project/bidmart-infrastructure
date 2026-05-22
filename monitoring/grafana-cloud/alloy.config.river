@@ -1,7 +1,6 @@
-// Optional Grafana Alloy config: scrape Heroku BidMart metrics and remote_write to Grafana Cloud.
-// 1. Export GRAFANA_CLOUD_* from Grafana Cloud → Prometheus → Details.
-// 2. Export METRICS_BASIC_USER / METRICS_BASIC_PASSWORD (same as Heroku apps).
-// 3. Run: alloy run monitoring/grafana-cloud/alloy.config.river
+// Optional Grafana Alloy: remote_write to Grafana Cloud.
+// Scrape: VPS gateway (staging + prod) + Heroku auth/order (container apps).
+// Export GRAFANA_CLOUD_* and METRICS_BASIC_USER / METRICS_BASIC_PASSWORD.
 
 prometheus.remote_write "grafana_cloud" {
   endpoint {
@@ -14,86 +13,86 @@ prometheus.remote_write "grafana_cloud" {
   }
 }
 
-prometheus.scrape "gateway" {
+prometheus.scrape "gateway_staging" {
   targets = [{
-    __address__ = "bidmart-infrastructure-1e27e116dbce.herokuapp.com:443",
-    job         = "bidmart-gateway",
+    __address__ = "bidmart-staging.43.157.208.68.sslip.io:443",
+    job         = "bidmart-gateway-staging",
   }]
-  scheme        = "https"
-  metrics_path  = "/actuator/prometheus"
+  scheme       = "https"
+  metrics_path = "/actuator/prometheus"
   basic_auth {
     username = env("METRICS_BASIC_USER")
     password = env("METRICS_BASIC_PASSWORD")
   }
-  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
-prometheus.scrape "auth" {
+prometheus.scrape "gateway_prod" {
   targets = [{
-    __address__ = "bidmart-authentication-service-5f40f293e67d.herokuapp.com:443",
-    job         = "bidmart-auth-service",
+    __address__ = "bidmart-prod.43.157.208.68.sslip.io:443",
+    job         = "bidmart-gateway-prod",
   }]
-  scheme        = "https"
-  metrics_path  = "/actuator/prometheus"
+  scheme       = "https"
+  metrics_path = "/actuator/prometheus"
   basic_auth {
     username = env("METRICS_BASIC_USER")
     password = env("METRICS_BASIC_PASSWORD")
   }
-  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
-prometheus.scrape "catalogue" {
+prometheus.scrape "auth_staging" {
   targets = [{
-    __address__ = "bidmart-catalogue-55e10efd36d3.herokuapp.com:443",
-    job         = "bidmart-catalogue-service",
+    __address__ = "bidmart-auth-staging-392ed0eda7b8.herokuapp.com:443",
+    job         = "bidmart-auth-staging",
   }]
-  scheme        = "https"
-  metrics_path  = "/actuator/prometheus"
+  scheme       = "https"
+  metrics_path = "/actuator/prometheus"
   basic_auth {
     username = env("METRICS_BASIC_USER")
     password = env("METRICS_BASIC_PASSWORD")
   }
-  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
-prometheus.scrape "auction" {
+prometheus.scrape "auth_prod" {
   targets = [{
-    __address__ = "bidmart-auction-service-c30c7668b800.herokuapp.com:443",
-    job         = "bidmart-auction-service",
+    __address__ = "bidmart-auth-876b62d83c69.herokuapp.com:443",
+    job         = "bidmart-auth",
   }]
-  scheme        = "https"
-  metrics_path  = "/metrics"
+  scheme       = "https"
+  metrics_path = "/actuator/prometheus"
   basic_auth {
     username = env("METRICS_BASIC_USER")
     password = env("METRICS_BASIC_PASSWORD")
   }
-  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
-prometheus.scrape "wallet" {
+prometheus.scrape "order_staging" {
   targets = [{
-    __address__ = "bidmart-wallet-service-rust-6b50e04f8883.herokuapp.com:443",
-    job         = "bidmart-wallet-service",
+    __address__ = "bidmart-order-staging-a5fd01b90144.herokuapp.com:443",
+    job         = "bidmart-order-staging",
   }]
-  scheme        = "https"
-  metrics_path  = "/metrics"
+  scheme       = "https"
+  metrics_path = "/actuator/prometheus"
   basic_auth {
     username = env("METRICS_BASIC_USER")
     password = env("METRICS_BASIC_PASSWORD")
   }
-  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
 
-prometheus.scrape "order" {
+prometheus.scrape "order_prod" {
   targets = [{
-    __address__ = "bidmart-order-and-notification-f03e03953732.herokuapp.com:443",
-    job         = "bidmart-order-service",
+    __address__ = "bidmart-order-ced842eeb858.herokuapp.com:443",
+    job         = "bidmart-order",
   }]
-  scheme        = "https"
-  metrics_path  = "/actuator/prometheus"
+  scheme       = "https"
+  metrics_path = "/actuator/prometheus"
   basic_auth {
     username = env("METRICS_BASIC_USER")
     password = env("METRICS_BASIC_PASSWORD")
   }
-  forward_to    = [prometheus.remote_write.grafana_cloud.receiver]
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
 }
