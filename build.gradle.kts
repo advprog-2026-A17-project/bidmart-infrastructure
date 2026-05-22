@@ -58,19 +58,40 @@ tasks.jacocoTestReport {
     }
 }
 
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.jacocoTestReport)
+    violationRules {
+        rule {
+            limit {
+                minimum = "0.90".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.check {
+    dependsOn(tasks.jacocoTestCoverageVerification)
+}
+
 sonar {
     properties {
         property("sonar.projectKey", "advprog-2026-A17-project_bidmart-infrastructure")
         property("sonar.organization", "advprog-2026-a17-project")
+        property("sonar.projectName", "bidmart-infrastructure")
         property("sonar.host.url", "https://sonarcloud.io")
         property("sonar.gradle.skipCompile", "true")
+        property("sonar.newCode.referenceBranch", "main")
         property(
             "sonar.coverage.jacoco.xmlReportPaths",
             "${layout.buildDirectory.get()}/reports/jacoco/test/jacocoTestReport.xml",
         )
         property(
             "sonar.coverage.exclusions",
-            ".github/workflows/**,deploy/vps/**,**/*.yml,**/*.yaml,**/*.sh,src/main/java/**/config/**,src/main/java/**/security/**",
+            "src/main/java/**/config/**,src/main/java/**/security/**",
+        )
+        property(
+            "sonar.exclusions",
+            ".github/workflows/**,deploy/**,monitoring/**,scripts/**,**/*.yml,**/*.yaml,**/*.sh",
         )
     }
 }
