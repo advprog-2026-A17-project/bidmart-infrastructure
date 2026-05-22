@@ -13,7 +13,7 @@ fi
 
 VPS_HOST="${VPS_HOST:-43.157.208.68}"
 VPS_USER="${VPS_USER:-root}"
-BRANCH="${BIDMART_BRANCH:-feat/checkpoint-100}"
+BRANCH="${BIDMART_BRANCH:-staging}"
 REMOTE_ROOT="${REMOTE_ROOT:-/opt/bidmart/${ENVIRONMENT}}"
 REMOTE_ENV_FILE="${REMOTE_ENV_FILE:-/etc/bidmart/${ENVIRONMENT}.env}"
 if [[ -n "${BIDMART_SSH:-}" ]]; then
@@ -25,11 +25,9 @@ else
 fi
 
 repos=(
-  "bidmart-auth-service:https://github.com/advprog-2026-A17-project/bidmart-auth-service.git"
   "bidmart-catalogue-service:https://github.com/advprog-2026-A17-project/bidmart-catalogue-service.git"
   "bidmart-auction-service-rust:https://github.com/advprog-2026-A17-project/bidmart-auction-service-rust.git"
   "bidmart-wallet-service-rust:https://github.com/advprog-2026-A17-project/bidmart-wallet-service-rust.git"
-  "bidmart-order-and-notification-service:https://github.com/advprog-2026-A17-project/bidmart-order-and-notification-service.git"
   "bidmart-infrastructure:https://github.com/advprog-2026-A17-project/bidmart-infrastructure.git"
 )
 
@@ -82,9 +80,12 @@ if ! docker info >/dev/null 2>&1; then
   DOCKER="sudo docker"
 fi
 
-COMPOSE_FILE="docker-compose.yml"
 if [[ "$ENVIRONMENT" == "prod" && -f "deploy/vps/docker-compose.prod.yml" ]]; then
   COMPOSE_FILE="deploy/vps/docker-compose.prod.yml"
+elif [[ "$ENVIRONMENT" == "staging" && -f "deploy/vps/docker-compose.staging.yml" ]]; then
+  COMPOSE_FILE="deploy/vps/docker-compose.staging.yml"
+else
+  COMPOSE_FILE="docker-compose.yml"
 fi
 
 $DOCKER compose \
