@@ -17,7 +17,13 @@ fi
 
 VPS_HOST="${VPS_HOST:-43.157.208.68}"
 VPS_USER="${VPS_USER:-root}"
-BRANCH="${BIDMART_BRANCH:-staging}"
+if [ -n "${BIDMART_BRANCH:-}" ]; then
+  BRANCH="$BIDMART_BRANCH"
+elif [ "$ENVIRONMENT" = "prod" ]; then
+  BRANCH=main
+else
+  BRANCH=staging
+fi
 REMOTE_ROOT="${REMOTE_ROOT:-/opt/bidmart/${ENVIRONMENT}}"
 REMOTE_ENV_FILE="${REMOTE_ENV_FILE:-/etc/bidmart/${ENVIRONMENT}.env}"
 if [[ -n "${BIDMART_SSH:-}" ]]; then
