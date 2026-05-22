@@ -1,12 +1,26 @@
 name: Deploy production VPS
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'deploy/**'
+      - 'docker-compose.yml'
+      - 'monitoring/**'
+      - 'scripts/**'
+      - 'src/**'
+      - 'Dockerfile'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'heroku.yml'
+      - '.github/workflows/deploy-prod-vps.yml'
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Git branch to deploy (default staging — promotes staging-tested commit)'
+        description: 'Git branch to deploy on the VPS (default main)'
         required: false
-        default: 'staging'
+        default: 'main'
   repository_dispatch:
     types: [deploy-vps-prod]
 
@@ -16,7 +30,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy production stack
+    name: Deploy VPS production stack
     runs-on: ubuntu-latest
     if: github.repository == 'advprog-2026-A17-project/bidmart-infrastructure'
     environment:
@@ -29,11 +43,19 @@ jobs:
         id: resolve
         env:
           INPUT_BRANCH: ${{ github.event.inputs.branch }}
+          CLIENT_BRANCH: ${{ github.event.client_payload.branch }}
         run: |
-          branch="${INPUT_BRANCH:-staging}"
-          if [ -z "$branch" ]; then branch=staging; fi
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            branch=main
+          elif [ -n "$INPUT_BRANCH" ]; then
+            branch="$INPUT_BRANCH"
+          elif [ -n "$CLIENT_BRANCH" ]; then
+            branch="$CLIENT_BRANCH"
+          else
+            branch=main
+          fi
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          echo "Deploying branch: $branch"
+          echo "Deploying VPS prod from branch: $branch"
 
       - name: Configure SSH alias
         env:
@@ -75,14 +97,14 @@ jobs:
           BIDMART_SSH: bidmart
         run: deploy/vps/deploy-edge.sh
 
-      - name: Smoke test public gateway
+      - name: Smoke test internal gateway
         env:
           BIDMART_SSH: bidmart
         run: |
           set -e
           for i in 1 2 3 4 5 6 7 8 9 10; do
             if ssh bidmart "curl -fsS --max-time 5 http://127.0.0.1:28000/actuator/health"; then
-              echo "Production gateway healthy"
+              echo "Production gateway healthy (internal)"
               exit 0
             fi
             echo "Production gateway not ready yet (attempt $i)"
@@ -90,4 +112,18 @@ jobs:
           done
           echo "::error::Production gateway never became healthy"
           ssh bidmart "docker ps --format 'table {{.Names}}\t{{.Status}}' | head -30" || true
+          exit 1
+
+      - name: Smoke test public edge
+        run: |
+          set -e
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsSk --max-time 15 https://bidmart-prod.43.157.208.68.sslip.io:8443/actuator/health; then
+              echo "Production edge healthy"
+              exit 0
+            fi
+            echo "Production edge not ready yet (attempt $i)"
+            sleep 5
+          done
+          echo "::error::Production public edge never became healthy"
           exit 1

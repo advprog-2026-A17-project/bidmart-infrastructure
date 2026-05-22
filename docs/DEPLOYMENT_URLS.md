@@ -7,8 +7,8 @@ Update env templates and platform config when these change. **Do not commit data
 | Environment | Gateway (all `/api/v1`, `/ws`) | Frontend (Vercel) |
 |-------------|----------------------------------|-------------------|
 | Local | `http://localhost:8000` | `http://localhost:5173` |
-| Staging | `https://bidmart-staging.43.157.208.68.sslip.io` | Preview deploy of branch `staging` (set `VITE_API_BASE_URL` to staging gateway) |
-| Production | `https://bidmart-prod.43.157.208.68.sslip.io` | `https://bidmart-frontend.vercel.app` |
+| Staging | `https://bidmart-staging.43.157.208.68.sslip.io:8443` | Preview deploy of branch `staging` (set `VITE_API_BASE_URL` to staging gateway) |
+| Production | `https://bidmart-prod.43.157.208.68.sslip.io:8443` | `https://bidmart-frontend.vercel.app` |
 
 ## Heroku (auth + order only, container)
 
@@ -62,3 +62,19 @@ FRONTEND_BASE_URL=https://bidmart-frontend.vercel.app
 | Auth / order | Heroku app URLs + `/actuator/prometheus` |
 
 See [monitoring/grafana-cloud/SCRAPE_TARGETS.md](../monitoring/grafana-cloud/SCRAPE_TARGETS.md).
+
+## VPS continuous deployment (GitHub Actions)
+
+| Environment | Trigger | Workflow | Git branch on VPS |
+|-------------|---------|----------|-------------------|
+| **Staging** | Push to `staging` on `bidmart-infrastructure` (paths: `deploy/**`, `src/**`, …) | `deploy-staging-vps.yml` | `staging` |
+| **Staging** | Push to `staging` on catalogue / auction / wallet | `trigger-vps-deploy.yml` → `deploy-vps-staging` | branch that was pushed |
+| **Production** | Push to `main` on `bidmart-infrastructure` | `deploy-prod-vps.yml` | `main` |
+| **Production** | Push to `main` on catalogue / auction / wallet | `trigger-vps-deploy.yml` → `deploy-vps-prod` | `main` |
+| **Production** | Manual | Actions → **Deploy production VPS** → branch `main` (default) | input branch |
+
+**Secrets** (repo `bidmart-infrastructure`): `BIDMART_SSH_PRIVATE_KEY`, optional `BIDMART_SSH_HOST` / `BIDMART_SSH_USER` / `BIDMART_SSH_PORT` (default `43.157.208.68`, `ubuntu`, `443`).
+
+**Secrets** (catalogue, auction, wallet): `VPS_DEPLOY_DISPATCH_TOKEN` (PAT with `repo` + `workflow` on infrastructure).
+
+Prod job uses GitHub Environment `production` (optional approval gate). Merge `staging` → `main` when promoting a release so prod CD runs on `main`.
