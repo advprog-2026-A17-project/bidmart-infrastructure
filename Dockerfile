@@ -6,12 +6,10 @@ WORKDIR /app
 COPY gradlew gradlew.bat ./
 COPY gradle gradle/
 COPY build.gradle.kts settings.gradle.kts ./
-RUN --mount=type=cache,id=gradle-infra,target=/root/.gradle \
-    chmod +x gradlew && ./gradlew dependencies --no-daemon || true
+RUN chmod +x gradlew && ./gradlew dependencies --no-daemon || true
 
 COPY src src/
-RUN --mount=type=cache,id=gradle-infra,target=/root/.gradle \
-    ./gradlew bootJar -x test --no-daemon
+RUN ./gradlew bootJar -x test --no-daemon
 
 # Stage 2: Run
 FROM eclipse-temurin:21-jre-alpine

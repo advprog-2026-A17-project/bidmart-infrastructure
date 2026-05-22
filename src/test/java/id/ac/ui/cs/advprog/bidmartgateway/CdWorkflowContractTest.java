@@ -2,16 +2,20 @@ package id.ac.ui.cs.advprog.bidmartgateway;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CdWorkflowContractTest {
 
     @Test
-    void cdWorkflowShouldDeployToStagingHerokuApp() {
-        String workflow = ContractFileReader.read(".github/workflows/cd.yml");
+    void repositoryUsesPlatformManagedDeploymentInsteadOfCdWorkflow() {
+        Path cdWorkflow = Path.of(".github/workflows/cd.yml");
+        String ciWorkflow = ContractFileReader.read(".github/workflows/ci.yml");
 
-        assertTrue(workflow.contains("branches:"));
-        assertTrue(workflow.contains("- staging"));
-        assertTrue(workflow.contains("heroku_app_name: ${{ secrets.HEROKU_APP_NAME_STAGING }}"));
+        assertFalse(Files.exists(cdWorkflow));
+        assertTrue(ciWorkflow.contains("cargo test") || ciWorkflow.contains("gradlew test"));
     }
 }

@@ -21,11 +21,16 @@ extra["springCloudVersion"] = "2023.0.1"
 
 dependencies {
     implementation("org.springframework.cloud:spring-cloud-starter-gateway")
+    implementation("org.springframework.cloud:spring-cloud-starter-loadbalancer")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     implementation("io.jsonwebtoken:jjwt-api:0.12.5")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.5")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.projectreactor:reactor-test")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }
 
 dependencyManagement {
@@ -58,5 +63,14 @@ sonar {
         property("sonar.projectKey", "advprog-2026-A17-project_bidmart-infrastructure")
         property("sonar.organization", "advprog-2026-a17-project")
         property("sonar.host.url", "https://sonarcloud.io")
+        property("sonar.gradle.skipCompile", "true")
+        property(
+            "sonar.coverage.jacoco.xmlReportPaths",
+            "${layout.buildDirectory.get()}/reports/jacoco/test/jacocoTestReport.xml",
+        )
+        property(
+            "sonar.coverage.exclusions",
+            ".github/workflows/**,deploy/vps/**,**/*.yml,**/*.yaml,**/*.sh,src/main/java/**/config/**,src/main/java/**/security/**",
+        )
     }
 }

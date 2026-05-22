@@ -1,0 +1,23 @@
+== BidMart monitoring verification ==
+
+-- Health endpoints --
+  OK   Gateway actuator health (network:gateway)
+  OK   Auth actuator health (network:auth-service)
+  OK   Catalogue actuator health (network:catalogue-service)
+  OK   Order actuator health (network:order-notification-service)
+  OK   Auction metrics (network:auction-service)
+  OK   Wallet metrics (network:wallet-service)
+
+-- Prometheus targets --
+  OK   Prometheus targets API
+  OK   target bidmart-auction-service
+  OK   target bidmart-auth-service
+  OK   target bidmart-catalogue-service
+  OK   target bidmart-gateway
+  OK   target bidmart-order-service
+  OK   target bidmart-wallet-service
+
+-- Grafana (optional) --
+  OK   Grafana API health (http://127.0.0.1:3001)
+
+All monitoring checks passed.
