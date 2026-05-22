@@ -68,5 +68,9 @@ sonar {
             "sonar.coverage.jacoco.xmlReportPaths",
             "${layout.buildDirectory.get()}/reports/jacoco/test/jacocoTestReport.xml",
         )
+        property(
+            "sonar.coverage.exclusions",
+            ".github/workflows/**,deploy/vps/**,**/*.yml,**/*.yaml,**/*.sh",
+        )
     }
 }
