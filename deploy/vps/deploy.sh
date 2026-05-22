@@ -16,8 +16,13 @@ VPS_USER="${VPS_USER:-root}"
 BRANCH="${BIDMART_BRANCH:-feat/checkpoint-100}"
 REMOTE_ROOT="${REMOTE_ROOT:-/opt/bidmart/${ENVIRONMENT}}"
 REMOTE_ENV_FILE="${REMOTE_ENV_FILE:-/etc/bidmart/${ENVIRONMENT}.env}"
-SSH_TARGET="${VPS_USER}@${VPS_HOST}"
-SSH_OPTS="${SSH_OPTS:-}"
+if [[ -n "${BIDMART_SSH:-}" ]]; then
+  SSH_TARGET="${BIDMART_SSH}"
+  SSH_OPTS="${SSH_OPTS:-}"
+else
+  SSH_TARGET="${VPS_USER}@${VPS_HOST}"
+  SSH_OPTS="${SSH_OPTS:--p 22}"
+fi
 
 repos=(
   "bidmart-auth-service:https://github.com/advprog-2026-A17-project/bidmart-auth-service.git"
@@ -67,13 +72,25 @@ set -a
 source .env
 set +a
 
-docker compose \
-  -f docker-compose.yml \
+DOCKER="docker"
+if ! docker info >/dev/null 2>&1; then
+  DOCKER="sudo docker"
+fi
+
+COMPOSE_FILE="docker-compose.yml"
+if [[ "$ENVIRONMENT" == "prod" && -f "deploy/vps/docker-compose.prod.yml" ]]; then
+  COMPOSE_FILE="deploy/vps/docker-compose.prod.yml"
+fi
+
+$DOCKER compose \
+  -f "$COMPOSE_FILE" \
   --env-file .env \
   up -d --build
 
-./scripts/verify-grpc-private.sh
-USE_DOCKER=true ./scripts/verify-monitoring.sh
+COMPOSE_FILE="$COMPOSE_FILE" ./scripts/verify-grpc-private.sh
+if [[ "$ENVIRONMENT" != "prod" ]]; then
+  USE_DOCKER=true ./scripts/verify-monitoring.sh
+fi
 REMOTE_SCRIPT
 
 scp $SSH_OPTS "$remote_script" "${SSH_TARGET}:/tmp/bidmart-vps-deploy.sh"

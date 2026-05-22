@@ -1,0 +1,117 @@
+name: ${COMPOSE_PROJECT_NAME:-bidmart-prod}
+
+services:
+  gateway:
+    image: ${GATEWAY_IMAGE:-bidmart-gateway:prod}
+    build:
+      context: ../..
+    ports:
+      - "${GATEWAY_PORT:-127.0.0.1:8000}:8000"
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      PORT: 8000
+      AUTH_SERVICE_INSTANCE_0: ${AUTH_SERVICE_INSTANCE_0:-https://bidmart-authentication-service.herokuapp.com}
+      ORDER_SERVICE_INSTANCE_0: ${ORDER_SERVICE_INSTANCE_0:-https://bidmart-order-and-notification.herokuapp.com}
+      CATALOGUE_SERVICE_INSTANCE_0: http://catalogue-service:8081
+      AUCTION_SERVICE_INSTANCE_0: http://auction-service:8082
+      WALLET_SERVICE_INSTANCE_0: http://wallet-service:8083
+      GATEWAY_AUTH_WS_SERVICE_URL: ${GATEWAY_AUTH_WS_SERVICE_URL:-https://bidmart-authentication-service.herokuapp.com}
+      GATEWAY_ORDER_WS_SERVICE_URL: ${GATEWAY_ORDER_WS_SERVICE_URL:-https://bidmart-order-and-notification.herokuapp.com}
+      GATEWAY_AUTH_SERVICE_URL: ${GATEWAY_AUTH_SERVICE_URL:-https://bidmart-authentication-service.herokuapp.com}
+      GATEWAY_CATALOGUE_SERVICE_URL: http://catalogue-service:8081
+      GATEWAY_AUCTION_SERVICE_URL: http://auction-service:8082
+      GATEWAY_WALLET_SERVICE_URL: http://wallet-service:8083
+      GATEWAY_ORDER_SERVICE_URL: ${GATEWAY_ORDER_SERVICE_URL:-https://bidmart-order-and-notification.herokuapp.com}
+    depends_on:
+      catalogue-service:
+        condition: service_healthy
+      auction-service:
+        condition: service_started
+      wallet-service:
+        condition: service_started
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  catalogue-service:
+    image: ${CATALOGUE_IMAGE:-bidmart-catalogue-service:prod}
+    build:
+      context: ../../../bidmart-catalogue-service
+    expose:
+      - "8081"
+      - "9091"
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      SPRING_DATASOURCE_URL: ${CATALOGUE_DATABASE_URL:-${JDBC_DATABASE_URL:-}}
+      SPRING_DATASOURCE_USERNAME: ${CATALOGUE_DB_USERNAME:-${JDBC_DATABASE_USERNAME:-}}
+      SPRING_DATASOURCE_PASSWORD: ${CATALOGUE_DB_PASSWORD:-${JDBC_DATABASE_PASSWORD:-}}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${CATALOGUE_DDL_AUTO:-update}
+      BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  auction-service:
+    image: ${AUCTION_IMAGE:-bidmart-auction-service-rust:prod}
+    build:
+      context: ../../../bidmart-auction-service-rust
+    expose:
+      - "8082"
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      BIND_ADDRESS: 0.0.0.0:8082
+      DATABASE_URL: ${AUCTION_DATABASE_URL:-${DATABASE_URL:-}}
+      CATALOGUE_SERVICE_URL: http://catalogue-service:8081
+      CATALOGUE_GRPC_URL: http://catalogue-service:9091
+      WALLET_SERVICE_URL: http://wallet-service:8083
+      WALLET_GRPC_URL: http://wallet-service:50051
+      BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
+      GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-}
+    depends_on:
+      catalogue-service:
+        condition: service_healthy
+      wallet-service:
+        condition: service_started
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  wallet-service:
+    image: ${WALLET_IMAGE:-bidmart-wallet-service-rust:prod}
+    build:
+      context: ../../../bidmart-wallet-service-rust
+    expose:
+      - "8083"
+      - "50051"
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      DATABASE_URL: ${WALLET_DATABASE_URL:-${DATABASE_URL:-}}
+      BIDMART_EVENTS_EXCHANGE: ${BIDMART_EVENTS_EXCHANGE:-bidmart.events}
+      GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-}
+      MIDTRANS_SANDBOX_BASE_URL: ${MIDTRANS_SANDBOX_BASE_URL:-https://api.sandbox.midtrans.com}
+      MIDTRANS_CHARGE_URL: ${MIDTRANS_CHARGE_URL:-https://api.sandbox.midtrans.com/v2/charge}
+      MIDTRANS_STATUS_BASE_URL: ${MIDTRANS_STATUS_BASE_URL:-https://api.sandbox.midtrans.com/v2}
+      MIDTRANS_BCA_VA_SIMULATOR_URL: ${MIDTRANS_BCA_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/bca/va/index}
+      MIDTRANS_BNI_VA_SIMULATOR_URL: ${MIDTRANS_BNI_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/bni/va/index}
+      MIDTRANS_BRI_VA_SIMULATOR_URL: ${MIDTRANS_BRI_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/bri/va/index}
+      MIDTRANS_PERMATA_VA_SIMULATOR_URL: ${MIDTRANS_PERMATA_VA_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/openapi/va/index}
+      MIDTRANS_MANDIRI_BILL_SIMULATOR_URL: ${MIDTRANS_MANDIRI_BILL_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/openapi/mandiri/index}
+      MIDTRANS_QRIS_SIMULATOR_URL: ${MIDTRANS_QRIS_SIMULATOR_URL:-https://simulator.sandbox.midtrans.com/qris/index}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-}
+      MIDTRANS_IRIS_BASE_URL: ${MIDTRANS_IRIS_BASE_URL:-https://app.sandbox.midtrans.com/iris/api/v1}
+      MIDTRANS_IRIS_API_KEY: ${MIDTRANS_IRIS_API_KEY:-}
+      MIDTRANS_IRIS_MERCHANT_KEY: ${MIDTRANS_IRIS_MERCHANT_KEY:-}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-https://bidmart-frontend.vercel.app}
+      PORT: 8083
+      GRPC_PORT: 50051
+      AUCTION_SERVICE_BASE_URL: http://auction-service:8082/api/v1/listings
+    restart: ${RESTART_POLICY:-unless-stopped}
