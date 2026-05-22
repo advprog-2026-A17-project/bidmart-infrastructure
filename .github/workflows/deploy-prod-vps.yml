@@ -1,14 +1,6 @@
 name: Deploy production VPS
 
 on:
-  push:
-    branches:
-      - staging
-    paths:
-      - 'deploy/**'
-      - 'docker-compose.yml'
-      - 'scripts/**'
-      - '.github/workflows/deploy-prod-vps.yml'
   workflow_dispatch:
 
 concurrency:
@@ -57,4 +49,4 @@ jobs:
       - name: Deploy edge proxy
         env:
           BIDMART_SSH: bidmart
-        run: deploy/vps/deploy-edge.sh prod
+        run: deploy/vps/deploy-edge.sh

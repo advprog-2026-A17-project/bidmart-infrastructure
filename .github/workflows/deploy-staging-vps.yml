@@ -9,6 +9,8 @@ on:
       - 'docker-compose.yml'
       - 'scripts/**'
       - '.github/workflows/deploy-staging-vps.yml'
+  repository_dispatch:
+    types: [deploy-vps-staging]
   workflow_dispatch:
 
 concurrency:
