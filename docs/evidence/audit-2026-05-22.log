@@ -15,7 +15,8 @@ SonarCloud quality gate (API):
 - bidmart-wallet-service-rust: NONE
 - bidmart-order-and-notification-service: NONE
 
-GitHub CI feat/checkpoint-100 (latest): all 7 repos success (2026-05-22)
+GitHub CI feat/checkpoint-100 (post-push 2026-05-22): all 7 repos success
+SonarCloud CI job (frontend push): success — verify quality gate in Sonar UI for branch
 
 Runtime (2026-05-22 local compose):
 - verify-grpc-private.sh: PASS
