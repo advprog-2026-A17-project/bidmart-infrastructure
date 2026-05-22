@@ -13,8 +13,20 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+    networks:
+      - default
+      - bidmart-prod
+      - bidmart-staging
     restart: unless-stopped
 
 volumes:
   caddy-data:
   caddy-config:
+
+networks:
+  bidmart-prod:
+    external: true
+    name: bidmart-prod_default
+  bidmart-staging:
+    external: true
+    name: bidmart-staging_default
